@@ -1,6 +1,10 @@
 package me.david.util;
 
 import me.david.EventCore;
+import org.bukkit.Location;
+import org.bukkit.WorldBorder;
+import org.bukkit.entity.Player;
+import org.bukkit.util.Vector;
 
 public class BorderUtil implements Runnable {
 
@@ -27,6 +31,45 @@ public class BorderUtil implements Runnable {
         autoBorder = value;
         EventCore.getInstance().getConfig().set("Settings.WorldBorder.AutoBorder", value);
         EventCore.getInstance().saveConfig();
+    }
+
+    public static boolean isBoostEnabled() {
+        return EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.Boost.Enabled", false);
+    }
+
+    public static boolean isOutsideBorder(Location location) {
+        WorldBorder worldBorder = location.getWorld().getWorldBorder();
+        return !worldBorder.isInside(location);
+    }
+
+    public static void applyBoost(Player player) {
+        if (!isBoostEnabled()) {
+            return;
+        }
+
+        Location playerLocation = player.getLocation();
+        WorldBorder worldBorder = player.getWorld().getWorldBorder();
+        if (worldBorder.isInside(playerLocation)) {
+            return;
+        }
+
+        double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
+        double boostY = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthY", 0.1);
+
+        Location center = worldBorder.getCenter();
+        Vector toCenter = center.toVector().subtract(playerLocation.toVector());
+        toCenter.setY(0);
+
+        Vector velocity;
+        if (toCenter.lengthSquared() < 0.0001) {
+            velocity = new Vector(0, boostY, 0);
+        } else {
+            toCenter.normalize().multiply(boostXZ);
+            toCenter.setY(boostY);
+            velocity = toCenter;
+        }
+
+        player.setVelocity(velocity);
     }
 
     @Override

@@ -18,7 +18,13 @@ public class MapManager {
     private Location spawnLocation;
 
     public MapManager() {
-        Scheduler.wait(() -> spawnLocation = LocationUtil.fromString(EventCore.getInstance().getConfig().getString("Settings.SpawnLocation", "world/0/200/0")), 2);
+        Scheduler.wait(this::reloadFromConfig, 2);
+    }
+
+    public void reloadFromConfig() {
+        spawnLocation = LocationUtil.fromString(
+                EventCore.getInstance().getConfig().getString("Settings.SpawnLocation", "world/0/200/0")
+        );
     }
 
     public void saveSpawnLocation(@NotNull final Player player) {
