@@ -65,7 +65,7 @@ public class EventCommand extends BukkitCommand {
                 }
                 case "reload" -> {
                     long start = System.currentTimeMillis();
-                    plugin.reloadRuntimeConfig();
+                    plugin.reloadConfig();
                     long reloadMs = System.currentTimeMillis() - start;
                     MessageUtil.sendPrefixed(player, "Event.ReloadSuccess", Map.of(
                             "%ms%", Component.text(String.valueOf(reloadMs))

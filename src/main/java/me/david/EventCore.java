@@ -81,9 +81,7 @@ public class EventCore extends JavaPlugin {
             }
             world.setGameRule(GameRule.ANNOUNCE_ADVANCEMENTS, false);
             world.setDifficulty(Difficulty.PEACEFUL);
-            world.getWorldBorder().setSize(BorderUtil.borderDefault);
-            world.getWorldBorder().setDamageBuffer(BorderUtil.borderDamageBuffer);
-            world.getWorldBorder().setDamageAmount(BorderUtil.borderDamageAmount);
+            applyWorldBorderSettings();
         }, 2);
 
         new Metrics(this, 28277);
@@ -107,11 +105,23 @@ public class EventCore extends JavaPlugin {
     public void reloadRuntimeConfig() {
         ConfigCache.get().reload();
         BorderUtil.reload();
+        if (mapManager != null) {
+            mapManager.reloadFromConfig();
+        }
         if (kitManager != null) {
             kitManager.loadAllKits();
         }
+        applyWorldBorderSettings();
         restartAutoBroadcast();
         restartActionbarTask();
+    }
+
+    private void applyWorldBorderSettings() {
+        for (World world : Bukkit.getWorlds()) {
+            world.getWorldBorder().setSize(BorderUtil.borderDefault);
+            world.getWorldBorder().setDamageBuffer(BorderUtil.borderDamageBuffer);
+            world.getWorldBorder().setDamageAmount(BorderUtil.borderDamageAmount);
+        }
     }
 
     private void startAutoBroadcast() {
