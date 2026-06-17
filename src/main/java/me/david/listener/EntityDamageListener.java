@@ -23,7 +23,7 @@ public class EntityDamageListener implements Listener {
             return;
         }
 
-        if (!(event.getEntity() instanceof Player player)) return;
+        if (!(event.getEntity() instanceof Player)) return;
 
         if (BorderUtil.isBoostEnabled() && event.getCause() == EntityDamageEvent.DamageCause.WORLD_BORDER) {
             event.setCancelled(true);

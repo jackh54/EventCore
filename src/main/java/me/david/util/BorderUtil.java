@@ -2,9 +2,13 @@ package me.david.util;
 
 import me.david.EventCore;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.WorldBorder;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class BorderUtil implements Runnable {
 
@@ -37,39 +41,99 @@ public class BorderUtil implements Runnable {
         return EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.Boost.Enabled", false);
     }
 
-    public static boolean isOutsideBorder(Location location) {
-        WorldBorder worldBorder = location.getWorld().getWorldBorder();
-        return !worldBorder.isInside(location);
+    public static @Nullable WorldBorder getBorder(@Nullable Location location) {
+        if (location == null || location.getWorld() == null) {
+            return null;
+        }
+        return location.getWorld().getWorldBorder();
     }
 
-    public static void applyBoost(Player player) {
+    public static boolean isOutsideBorder(@Nullable Location location) {
+        WorldBorder worldBorder = getBorder(location);
+        return location != null && worldBorder != null && !worldBorder.isInside(location);
+    }
+
+    public static @NotNull Location clampInsideBorder(@NotNull Location location) {
+        WorldBorder worldBorder = location.getWorld().getWorldBorder();
+        Location center = worldBorder.getCenter();
+        double halfSize = Math.max(0.5, (worldBorder.getSize() / 2.0) - 0.5);
+
+        double dx = location.getX() - center.getX();
+        double dz = location.getZ() - center.getZ();
+        double horizontalDistance = Math.hypot(dx, dz);
+        if (horizontalDistance <= halfSize) {
+            return location;
+        }
+
+        double scale = halfSize / horizontalDistance;
+        return new Location(
+                location.getWorld(),
+                center.getX() + (dx * scale),
+                location.getY(),
+                center.getZ() + (dz * scale),
+                location.getYaw(),
+                location.getPitch()
+        );
+    }
+
+    public static void applyBoost(@NotNull Player player) {
         if (!isBoostEnabled()) {
             return;
         }
 
-        Location playerLocation = player.getLocation();
-        WorldBorder worldBorder = player.getWorld().getWorldBorder();
-        if (worldBorder.isInside(playerLocation)) {
+        Scheduler.runForEntity(player, () -> {
+            Location playerLocation = player.getLocation();
+            WorldBorder worldBorder = player.getWorld().getWorldBorder();
+            if (worldBorder.isInside(playerLocation)) {
+                return;
+            }
+
+            double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
+            double boostY = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthY", 0.1);
+
+            Location center = worldBorder.getCenter();
+            Vector toCenter = center.toVector().subtract(playerLocation.toVector());
+            toCenter.setY(0);
+
+            Vector velocity;
+            if (toCenter.lengthSquared() < 0.0001) {
+                velocity = new Vector(0, boostY, 0);
+            } else {
+                toCenter.normalize().multiply(boostXZ);
+                toCenter.setY(boostY);
+                velocity = toCenter;
+            }
+
+            player.setVelocity(velocity);
+        });
+    }
+
+    public static void syncWorldBorder(@Nullable Location spawn) {
+        if (spawn == null || spawn.getWorld() == null) {
             return;
         }
 
-        double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
-        double boostY = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthY", 0.1);
+        World world = spawn.getWorld();
+        WorldBorder border = world.getWorldBorder();
+        border.setCenter(spawn.getX(), spawn.getZ());
+        border.setSize(borderDefault);
+        border.setDamageBuffer(borderDamageBuffer);
+        border.setDamageAmount(isBoostEnabled() ? 0 : borderDamageAmount);
+    }
 
-        Location center = worldBorder.getCenter();
-        Vector toCenter = center.toVector().subtract(playerLocation.toVector());
-        toCenter.setY(0);
+    public static void syncAllWorldBorders(@Nullable Location spawn) {
+        syncWorldBorder(spawn);
 
-        Vector velocity;
-        if (toCenter.lengthSquared() < 0.0001) {
-            velocity = new Vector(0, boostY, 0);
-        } else {
-            toCenter.normalize().multiply(boostXZ);
-            toCenter.setY(boostY);
-            velocity = toCenter;
+        for (World world : EventCore.getInstance().getServer().getWorlds()) {
+            if (spawn != null && spawn.getWorld() != null && world.equals(spawn.getWorld())) {
+                continue;
+            }
+
+            WorldBorder border = world.getWorldBorder();
+            border.setSize(borderDefault);
+            border.setDamageBuffer(borderDamageBuffer);
+            border.setDamageAmount(isBoostEnabled() ? 0 : borderDamageAmount);
         }
-
-        player.setVelocity(velocity);
     }
 
     @Override

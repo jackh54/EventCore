@@ -13,11 +13,16 @@ public class PlayerInteractListener implements Listener {
         final Player player = event.getPlayer();
 
         if (player.hasPermission("event.bypass")) {
-            event.setCancelled(false);
             return;
         }
 
-        event.setCancelled(!(EventCore.getInstance().getGameManager().isRunning()));
+        if (EventCore.getInstance().getGameManager().isRunning()) {
+            return;
+        }
+
+        if (event.getClickedBlock() != null) {
+            event.setCancelled(true);
+        }
     }
 
 }

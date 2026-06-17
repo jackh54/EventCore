@@ -5,6 +5,7 @@ import me.david.EventCore;
 import me.david.api.events.map.MapDropEvent;
 import me.david.api.events.map.MapResetEvent;
 import me.david.api.events.map.SpawnLocationChangeEvent;
+import me.david.util.BorderUtil;
 import me.david.util.LocationUtil;
 import me.david.util.Scheduler;
 import org.bukkit.Bukkit;
@@ -43,6 +44,7 @@ public class MapManager {
 
         EventCore.getInstance().getConfig().set("Settings.SpawnLocation", location);
         EventCore.getInstance().saveConfig();
+        BorderUtil.syncWorldBorder(spawnLocation);
     }
 
     public void drop() {

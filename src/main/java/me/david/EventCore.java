@@ -11,7 +11,9 @@ import me.david.util.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
+import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
@@ -62,6 +64,7 @@ public class EventCore extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PlayerDropItemListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerInteractListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerJoinListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerMoveListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerPickupItemListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerQuitListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(), this);
@@ -121,11 +124,7 @@ public class EventCore extends JavaPlugin {
     }
 
     private void applyWorldBorderSettings() {
-        for (World world : Bukkit.getWorlds()) {
-            world.getWorldBorder().setSize(BorderUtil.borderDefault);
-            world.getWorldBorder().setDamageBuffer(BorderUtil.borderDamageBuffer);
-            world.getWorldBorder().setDamageAmount(BorderUtil.borderDamageAmount);
-        }
+        BorderUtil.syncAllWorldBorders(mapManager != null ? mapManager.getSpawnLocation() : null);
     }
 
     private void startAutoBroadcast() {
@@ -180,16 +179,16 @@ public class EventCore extends JavaPlugin {
         }
 
         borderBoostTask = Scheduler.timer(() -> {
-            if (!gameManager.isRunning()) {
-                return;
-            }
-
             for (Player player : Bukkit.getOnlinePlayers()) {
-                if (BorderUtil.isOutsideBorder(player.getLocation())) {
-                    BorderUtil.applyBoost(player);
+                if (!BorderUtil.isOutsideBorder(player.getLocation())) {
+                    continue;
                 }
+
+                Location clamped = BorderUtil.clampInsideBorder(player.getLocation());
+                Scheduler.runForEntity(player, () -> player.teleportAsync(clamped));
+                BorderUtil.applyBoost(player);
             }
-        }, 1, 5);
+        }, 1, 2);
     }
 
     private void stopBorderBoostTask() {
