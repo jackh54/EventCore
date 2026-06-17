@@ -21,8 +21,6 @@ import java.util.logging.Logger;
 @Getter
 public class KitManager {
 
-    // Mio - All of these changes can be seen as a temporary fix – the plan for the future is still to rewrite the entire class.
-
     private final Logger LOGGER = Logger.getLogger("KitManager");
 
     private volatile String enabledKit = "default";
@@ -34,17 +32,24 @@ public class KitManager {
 
     public void give(@NotNull final Player player) {
         Map<Integer, ItemStack> kitItems = kits.get(enabledKit);
-        if (kitItems == null || kitItems.isEmpty()) return;
+        if (kitItems == null || kitItems.isEmpty()) {
+            return;
+        }
 
         KitGiveEvent kitGiveEvent = new KitGiveEvent(player, enabledKit);
         Bukkit.getPluginManager().callEvent(kitGiveEvent);
-        if (kitGiveEvent.isCancelled()) return;
+        if (kitGiveEvent.isCancelled()) {
+            return;
+        }
 
         player.getInventory().clear();
         player.getInventory().setArmorContents(null);
 
         for (Map.Entry<Integer, ItemStack> entry : kitItems.entrySet()) {
-            player.getInventory().setItem(entry.getKey(), entry.getValue());
+            ItemStack item = entry.getValue();
+            if (item != null) {
+                player.getInventory().setItem(entry.getKey(), item.clone());
+            }
         }
     }
 
@@ -54,32 +59,50 @@ public class KitManager {
         enabledKit = config.getString("Kits.EnabledKit", "default");
 
         final ConfigurationSection section = config.getConfigurationSection("Kits.Kits");
-        if (section == null) return;
+        if (section == null) {
+            LOGGER.warning("No kits found in config.");
+            return;
+        }
 
         for (String kitName : section.getKeys(false)) {
             final ConfigurationSection kitSection = section.getConfigurationSection(kitName);
-            if (kitSection == null) continue;
+            if (kitSection == null) {
+                kits.put(kitName, new ConcurrentHashMap<>());
+                continue;
+            }
 
             final Map<Integer, ItemStack> map = new ConcurrentHashMap<>();
             for (String key : kitSection.getKeys(false)) {
                 try {
                     int slot = Integer.parseInt(key);
                     ItemStack item = kitSection.getItemStack(key);
-                    if (item != null) map.put(slot, item.clone());
-                } catch (NumberFormatException ignored) {}
+                    if (item != null) {
+                        map.put(slot, item.clone());
+                    }
+                } catch (NumberFormatException ignored) {
+                }
             }
             kits.put(kitName, map);
         }
-        LOGGER.info("Loaded " + kits.size() + " kits into memory.");
+
+        if (!kits.containsKey(enabledKit)) {
+            kits.put(enabledKit, new ConcurrentHashMap<>());
+        }
+
+        LOGGER.info("Loaded " + kits.size() + " kits into memory. Enabled kit: " + enabledKit
+                + " (" + kits.getOrDefault(enabledKit, Map.of()).size() + " items)");
     }
 
     public void save(@NotNull final String kit, @NotNull final Player player) {
         final KitSaveEvent kitSaveEvent = new KitSaveEvent(kit, player);
         Bukkit.getPluginManager().callEvent(kitSaveEvent);
-        if (kitSaveEvent.isCancelled()) return;
+        if (kitSaveEvent.isCancelled()) {
+            return;
+        }
 
         try {
             final FileConfiguration config = EventCore.getInstance().getConfig();
+            config.set("Kits.Kits." + kit, null);
             final ConfigurationSection kitSection = config.createSection("Kits.Kits." + kit);
 
             Map<Integer, ItemStack> cacheMap = new ConcurrentHashMap<>();
@@ -110,7 +133,9 @@ public class KitManager {
         final String previousKit = enabledKit;
         final KitEnableEvent event = new KitEnableEvent(kit, previousKit);
         Bukkit.getPluginManager().callEvent(event);
-        if (event.isCancelled()) return;
+        if (event.isCancelled()) {
+            return;
+        }
 
         enabledKit = kit;
         EventCore.getInstance().getConfig().set("Kits.EnabledKit", kit);
@@ -122,7 +147,9 @@ public class KitManager {
     public void delete(@NotNull final String kit) {
         final KitDeleteEvent event = new KitDeleteEvent(kit);
         Bukkit.getPluginManager().callEvent(event);
-        if (event.isCancelled()) return;
+        if (event.isCancelled()) {
+            return;
+        }
 
         kits.remove(kit);
         EventCore.getInstance().getConfig().set("Kits.Kits." + kit, null);
