@@ -53,29 +53,6 @@ public class BorderUtil implements Runnable {
         return location != null && worldBorder != null && !worldBorder.isInside(location);
     }
 
-    public static @NotNull Location clampInsideBorder(@NotNull Location location) {
-        WorldBorder worldBorder = location.getWorld().getWorldBorder();
-        Location center = worldBorder.getCenter();
-        double halfSize = Math.max(0.5, (worldBorder.getSize() / 2.0) - 0.5);
-
-        double dx = location.getX() - center.getX();
-        double dz = location.getZ() - center.getZ();
-        double horizontalDistance = Math.hypot(dx, dz);
-        if (horizontalDistance <= halfSize) {
-            return location;
-        }
-
-        double scale = halfSize / horizontalDistance;
-        return new Location(
-                location.getWorld(),
-                center.getX() + (dx * scale),
-                location.getY(),
-                center.getZ() + (dz * scale),
-                location.getYaw(),
-                location.getPitch()
-        );
-    }
-
     public static void applyBoost(@NotNull Player player) {
         if (!isBoostEnabled()) {
             return;
@@ -95,16 +72,14 @@ public class BorderUtil implements Runnable {
             Vector toCenter = center.toVector().subtract(playerLocation.toVector());
             toCenter.setY(0);
 
-            Vector velocity;
             if (toCenter.lengthSquared() < 0.0001) {
-                velocity = new Vector(0, boostY, 0);
-            } else {
-                toCenter.normalize().multiply(boostXZ);
-                toCenter.setY(boostY);
-                velocity = toCenter;
+                player.setVelocity(player.getVelocity().add(new Vector(0, boostY, 0)));
+                return;
             }
 
-            player.setVelocity(velocity);
+            toCenter.normalize().multiply(boostXZ);
+            toCenter.setY(boostY);
+            player.setVelocity(player.getVelocity().add(toCenter));
         });
     }
 

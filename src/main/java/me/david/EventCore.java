@@ -11,9 +11,7 @@ import me.david.util.*;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
-import org.bukkit.Location;
 import org.bukkit.World;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.slf4j.Logger;
@@ -180,15 +178,11 @@ public class EventCore extends JavaPlugin {
 
         borderBoostTask = Scheduler.timer(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
-                if (!BorderUtil.isOutsideBorder(player.getLocation())) {
-                    continue;
+                if (BorderUtil.isOutsideBorder(player.getLocation())) {
+                    BorderUtil.applyBoost(player);
                 }
-
-                Location clamped = BorderUtil.clampInsideBorder(player.getLocation());
-                Scheduler.runForEntity(player, () -> player.teleportAsync(clamped));
-                BorderUtil.applyBoost(player);
             }
-        }, 1, 2);
+        }, 1, 10);
     }
 
     private void stopBorderBoostTask() {

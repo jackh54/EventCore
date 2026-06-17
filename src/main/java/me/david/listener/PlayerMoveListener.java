@@ -15,13 +15,13 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
+        Location from = event.getFrom();
         Location to = event.getTo();
         if (to == null || !BorderUtil.isOutsideBorder(to)) {
             return;
         }
 
-        Location clamped = BorderUtil.clampInsideBorder(to);
-        event.setTo(clamped);
+        event.setTo(from);
         BorderUtil.applyBoost(event.getPlayer());
     }
 
