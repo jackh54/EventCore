@@ -162,7 +162,13 @@ AutoBroadcast: # Messages that are automatically broadcasted
   UseBroadcastCommand: false # Activate whether the 'BroadcastCommand' command should be used
   BroadcastCommand: "/bc %message%"
 
-Kits: # Change the setting only with '/event kit'
+Kits: # Change kits with /kit save <name> and /kit enable <name>
   EnabledKit: 'default'
   Kits:
-    default: '-'
+    default: '-' # Placeholder for an empty kit
+    # Supported formats:
+    # 1) Legacy base64 string (older EventCore versions)
+    # 2) Per-slot YAML section created by /kit save <name>:
+    #    mykit:
+    #      '0': {item data}
+    #      '1': {item data}
