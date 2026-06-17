@@ -21,6 +21,7 @@ public class MessageUtil {
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final Pattern LEGACY_COLOR = Pattern.compile("&([0-9a-fk-or])");
     private static final Pattern HEX_COLOR = Pattern.compile("&#([A-Fa-f0-9]{6})");
+    private static final Pattern MINI_MESSAGE_TAG = Pattern.compile("<[a-z#/!?][^>]*>", Pattern.CASE_INSENSITIVE);
 
     public Component get(@NotNull String key) {
         return translateColorCodes(EventCore.getInstance().getConfig().getString(key, ""));
@@ -74,7 +75,11 @@ public class MessageUtil {
             return Component.empty();
         }
 
-        if (message.indexOf('<') >= 0 && message.indexOf('>') > message.indexOf('<')) {
+        if (message.startsWith("mm:")) {
+            return MINI.deserialize(message.substring(3));
+        }
+
+        if (usesMiniMessageTags(message)) {
             return MINI.deserialize(message);
         }
 
@@ -94,6 +99,25 @@ public class MessageUtil {
         }
         matcher.appendTail(buffer);
         return LEGACY.deserialize(buffer.toString());
+    }
+
+    private boolean usesMiniMessageTags(@NotNull String message) {
+        Matcher matcher = MINI_MESSAGE_TAG.matcher(message);
+        while (matcher.find()) {
+            String tag = matcher.group();
+            String tagName = tag.substring(1, tag.length() - 1).split(":", 2)[0].toLowerCase();
+            if (!isPlaceholderToken(tagName)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isPlaceholderToken(@NotNull String token) {
+        return switch (token) {
+            case "player", "killer", "winner", "timer", "prefix", "message", "kit", "version", "platform", "ms" -> true;
+            default -> false;
+        };
     }
 
 }
