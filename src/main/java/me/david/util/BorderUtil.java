@@ -5,6 +5,8 @@ import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
 import org.bukkit.block.Block;
+import org.bukkit.damage.DamageSource;
+import org.bukkit.damage.DamageType;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +24,7 @@ public class BorderUtil implements Runnable {
     public static int lastOptimal = borderDefault;
     public static boolean autoBorder;
 
+    private static final int SAFE_PATH_CHECK_STEPS = 3;
     private static final Map<UUID, Long> LAST_UNSAFE_DAMAGE = new ConcurrentHashMap<>();
 
     public BorderUtil() {
@@ -58,9 +61,36 @@ public class BorderUtil implements Runnable {
         return location.getWorld().getWorldBorder();
     }
 
-    public static boolean isOutsideBorder(@Nullable Location location) {
+    public static boolean isInsideBorder(@Nullable Location location) {
         WorldBorder worldBorder = getBorder(location);
-        return location != null && worldBorder != null && !worldBorder.isInside(location);
+        return location != null && worldBorder != null && worldBorder.isInside(location);
+    }
+
+    public static boolean isOutsideBorder(@Nullable Location location) {
+        return !isInsideBorder(location);
+    }
+
+    public static @NotNull Location clampInsideBorder(@NotNull Location location) {
+        WorldBorder worldBorder = location.getWorld().getWorldBorder();
+        Location center = worldBorder.getCenter();
+        double halfSize = Math.max(0.1, (worldBorder.getSize() / 2.0) - 0.35);
+
+        double dx = location.getX() - center.getX();
+        double dz = location.getZ() - center.getZ();
+        double horizontalDistance = Math.hypot(dx, dz);
+        if (horizontalDistance <= halfSize) {
+            return location;
+        }
+
+        double scale = halfSize / horizontalDistance;
+        return new Location(
+                location.getWorld(),
+                center.getX() + (dx * scale),
+                location.getY(),
+                center.getZ() + (dz * scale),
+                location.getYaw(),
+                location.getPitch()
+        );
     }
 
     public static boolean hasSafeBoostSpace(@NotNull Player player) {
@@ -71,14 +101,22 @@ public class BorderUtil implements Runnable {
 
         WorldBorder worldBorder = player.getWorld().getWorldBorder();
         Location center = worldBorder.getCenter();
-        Vector toCenter = center.toVector().subtract(location.toVector());
-        toCenter.setY(0);
-        if (toCenter.lengthSquared() < 0.0001) {
+        Vector direction = center.toVector().subtract(location.toVector());
+        direction.setY(0);
+        if (direction.lengthSquared() < 0.0001) {
             return true;
         }
 
-        Location step = location.clone().add(toCenter.normalize());
-        return hasStandingRoom(step);
+        direction.normalize();
+        Location probe = location.clone();
+        for (int step = 1; step <= SAFE_PATH_CHECK_STEPS; step++) {
+            probe.add(direction);
+            if (!hasStandingRoom(probe)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private static boolean hasStandingRoom(@NotNull Location location) {
@@ -87,17 +125,15 @@ public class BorderUtil implements Runnable {
         int y = location.getBlockY();
         int z = location.getBlockZ();
 
-        Block feet = world.getBlockAt(x, y, z);
-        Block head = world.getBlockAt(x, y + 1, z);
-        return isPassable(feet) && isPassable(head);
+        return isPassable(world.getBlockAt(x, y, z)) && isPassable(world.getBlockAt(x, y + 1, z));
     }
 
     private static boolean isPassable(@NotNull Block block) {
         return block.isPassable() || block.isLiquid();
     }
 
-    public static void handleOutsideBorder(@NotNull Player player) {
-        if (!isBoostEnabled()) {
+    public static void tickOutsidePlayer(@NotNull Player player) {
+        if (!isBoostEnabled() || !isOutsideBorder(player.getLocation())) {
             return;
         }
 
@@ -114,37 +150,27 @@ public class BorderUtil implements Runnable {
         });
     }
 
-    public static void applyBoost(@NotNull Player player) {
-        if (!isBoostEnabled() || !hasSafeBoostSpace(player)) {
+    private static void applyBoost(@NotNull Player player) {
+        Location playerLocation = player.getLocation();
+        WorldBorder worldBorder = player.getWorld().getWorldBorder();
+        if (worldBorder.isInside(playerLocation) || !hasSafeBoostSpace(player)) {
             return;
         }
 
-        Scheduler.runForEntity(player, () -> {
-            Location playerLocation = player.getLocation();
-            WorldBorder worldBorder = player.getWorld().getWorldBorder();
-            if (worldBorder.isInside(playerLocation)) {
-                return;
-            }
+        double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
 
-            double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
-            double boostY = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthY", 0.1);
+        Location center = worldBorder.getCenter();
+        Vector push = center.toVector().subtract(playerLocation.toVector());
+        push.setY(0);
+        if (push.lengthSquared() < 0.0001) {
+            return;
+        }
 
-            Location center = worldBorder.getCenter();
-            Vector toCenter = center.toVector().subtract(playerLocation.toVector());
-            toCenter.setY(0);
-
-            if (toCenter.lengthSquared() < 0.0001) {
-                player.setVelocity(player.getVelocity().add(new Vector(0, boostY, 0)));
-                return;
-            }
-
-            toCenter.normalize().multiply(boostXZ);
-            toCenter.setY(boostY);
-            player.setVelocity(player.getVelocity().add(toCenter));
-        });
+        push.normalize().multiply(boostXZ);
+        player.setVelocity(push);
     }
 
-    public static void applyUnsafeDamage(@NotNull Player player) {
+    private static void applyUnsafeDamage(@NotNull Player player) {
         double damage = getUnsafeDamage();
         if (damage <= 0) {
             return;
@@ -157,7 +183,8 @@ public class BorderUtil implements Runnable {
         }
         LAST_UNSAFE_DAMAGE.put(playerId, now);
 
-        Scheduler.runForEntity(player, () -> player.damage(damage));
+        DamageSource source = DamageSource.builder(DamageType.OUTSIDE_BORDER).build();
+        player.damage(damage, source);
     }
 
     public static void syncWorldBorder(@Nullable Location spawn) {

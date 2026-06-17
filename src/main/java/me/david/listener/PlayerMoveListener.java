@@ -5,7 +5,6 @@ import org.bukkit.Location;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 
 public class PlayerMoveListener implements Listener {
@@ -18,12 +17,15 @@ public class PlayerMoveListener implements Listener {
 
         Location from = event.getFrom();
         Location to = event.getTo();
-        if (to == null || !BorderUtil.isOutsideBorder(to)) {
+        if (to == null) {
             return;
         }
 
-        event.setTo(from);
-        BorderUtil.handleOutsideBorder(event.getPlayer());
+        if (!BorderUtil.isInsideBorder(from) || BorderUtil.isInsideBorder(to)) {
+            return;
+        }
+
+        event.setTo(BorderUtil.clampInsideBorder(to));
     }
 
 }
