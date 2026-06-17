@@ -1,5 +1,6 @@
 package me.david.command;
 
+import me.david.util.ConfigCache;
 import me.david.util.MessageUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -36,7 +37,7 @@ public abstract class BukkitCommand extends Command {
         if (permission == null || sender.hasPermission(permission)) {
             onCommand(sender, label, args);
         } else {
-            sender.sendMessage(MessageUtil.translateColorCodes("&cYou don't have permission to use this command!"));
+            sender.sendMessage(MessageUtil.translateColorCodes(ConfigCache.get().getNoPermissionMessage()));
         }
         return true;
     }
@@ -45,7 +46,6 @@ public abstract class BukkitCommand extends Command {
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String alias, String[] args) throws IllegalArgumentException {
         return onTabComplete(sender, alias, args);
     }
-
 
     private void registerCommand(Command command) {
         Bukkit.getCommandMap().register("eventcore", command);

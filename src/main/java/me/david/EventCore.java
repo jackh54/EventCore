@@ -27,48 +27,58 @@ public class EventCore extends JavaPlugin {
     private MapManager mapManager;
     private GameManager gameManager;
     private KitManager kitManager;
+    private Scheduler.TaskWrapper actionbarTask;
+    private Scheduler.TaskWrapper autoBroadcastTask;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         instance = this;
 
-        new UpdateChecker(instance, "DavidArchive", "EventCore").check();
+        ConfigCache.get().reload();
+        BorderUtil.reload();
+
+        new UpdateChecker(this, "DavidArchive", "EventCore").check();
 
         mapManager = new MapManager();
         gameManager = new GameManager();
         kitManager = new KitManager();
 
-        new AnnouncementCommand(instance);
-        new EventCommand(instance);
-        new KitCommand(instance);
+        new AnnouncementCommand(this);
+        new EventCommand(this);
+        new KitCommand(this);
         new ReviveCommand();
-        new SpawnCommand(instance);
+        new SpawnCommand(this);
 
-        Bukkit.getPluginManager().registerEvents(new BlockBreakListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new BlockExplodeListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new BlockPlaceListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new CreatureSpawnListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new EntityDamageByEntityListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new EntityDamageListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new EntityExplodeListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerDropItemListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerInteractListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerJoinListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerPickupItemListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerQuitListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(), instance);
-        Bukkit.getPluginManager().registerEvents(new PlayerTeleportListener(), instance);
+        Bukkit.getPluginManager().registerEvents(new BlockBreakListener(), this);
+        Bukkit.getPluginManager().registerEvents(new BlockExplodeListener(), this);
+        Bukkit.getPluginManager().registerEvents(new BlockPlaceListener(), this);
+        Bukkit.getPluginManager().registerEvents(new CreatureSpawnListener(), this);
+        Bukkit.getPluginManager().registerEvents(new EntityDamageByEntityListener(), this);
+        Bukkit.getPluginManager().registerEvents(new EntityDamageListener(), this);
+        Bukkit.getPluginManager().registerEvents(new EntityExplodeListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerDeathListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerDropItemListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerInteractListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerJoinListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerPickupItemListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerQuitListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerTeleportListener(), this);
 
         if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
             new PlaceholderHook().register();
         }
 
         Scheduler.timerAsync(new BorderUtil(), 20, 10);
-        Scheduler.timerAsync(new AutoBroadcast(), 20, 20 * getConfig().getLong("AutoBroadcast.Interval", 60));
+        startAutoBroadcast();
+        startActionbarTask();
+
         Scheduler.wait(() -> {
             World world = mapManager.getSpawnLocation().getWorld();
+            if (world == null) {
+                return;
+            }
             world.setGameRule(GameRule.ANNOUNCE_ADVANCEMENTS, false);
             world.setDifficulty(Difficulty.PEACEFUL);
             world.getWorldBorder().setSize(BorderUtil.borderDefault);
@@ -76,25 +86,77 @@ public class EventCore extends JavaPlugin {
             world.getWorldBorder().setDamageAmount(BorderUtil.borderDamageAmount);
         }, 2);
 
-        if (getConfig().getBoolean("Messages.Actionbar.Enabled")) {
-            Scheduler.timerAsync(() -> {
-                for (Player player : Bukkit.getOnlinePlayers()) {
-                    String raw = getConfig().getString("Messages.Actionbar.Message", "&aYou are playing the best Event!");
-                    String parsed = PlaceholderAPI.setPlaceholders(player, raw);
-
-                    player.sendActionBar(MessageUtil.translateColorCodes(parsed));
-                }
-            }, 0, 20);
-        }
-
         new Metrics(this, 28277);
     }
 
     @Override
     public void onDisable() {
-        if (gameManager.isRunning()) {
+        stopActionbarTask();
+        stopAutoBroadcast();
+        if (gameManager != null && gameManager.isRunning()) {
             gameManager.stop(null);
         }
+    }
+
+    @Override
+    public void reloadConfig() {
+        super.reloadConfig();
+        reloadRuntimeConfig();
+    }
+
+    public void reloadRuntimeConfig() {
+        ConfigCache.get().reload();
+        BorderUtil.reload();
+        if (kitManager != null) {
+            kitManager.loadAllKits();
+        }
+        restartAutoBroadcast();
+        restartActionbarTask();
+    }
+
+    private void startAutoBroadcast() {
+        stopAutoBroadcast();
+        long interval = ConfigCache.get().getAutoBroadcastInterval();
+        autoBroadcastTask = Scheduler.timerAsync(new AutoBroadcast(), 20, 20 * interval);
+    }
+
+    private void stopAutoBroadcast() {
+        if (autoBroadcastTask != null) {
+            autoBroadcastTask.cancel();
+            autoBroadcastTask = null;
+        }
+    }
+
+    private void restartAutoBroadcast() {
+        startAutoBroadcast();
+    }
+
+    private void startActionbarTask() {
+        stopActionbarTask();
+        if (!ConfigCache.get().isActionbarEnabled()) {
+            return;
+        }
+
+        actionbarTask = Scheduler.timer(() -> {
+            String raw = ConfigCache.get().getActionbarMessage();
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                String parsed = Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null
+                        ? PlaceholderAPI.setPlaceholders(player, raw)
+                        : raw;
+                player.sendActionBar(MessageUtil.translateColorCodes(parsed));
+            }
+        }, 0, 20);
+    }
+
+    private void stopActionbarTask() {
+        if (actionbarTask != null) {
+            actionbarTask.cancel();
+            actionbarTask = null;
+        }
+    }
+
+    private void restartActionbarTask() {
+        startActionbarTask();
     }
 
 }

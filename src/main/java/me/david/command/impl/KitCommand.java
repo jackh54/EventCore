@@ -3,6 +3,7 @@ package me.david.command.impl;
 import me.david.EventCore;
 import me.david.command.BukkitCommand;
 import me.david.util.MessageUtil;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -10,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class KitCommand extends BukkitCommand {
 
@@ -23,23 +25,25 @@ public class KitCommand extends BukkitCommand {
     @Override
     public void onCommand(CommandSender sender, String label, String[] args) {
         if (!(sender instanceof final Player player)) return;
-        if (!(player.hasPermission("event.command"))) return;
+        if (!player.hasPermission("event.command")) return;
 
         if (args.length == 1) {
             if (args[0].equalsIgnoreCase("*")) {
                 Bukkit.getOnlinePlayers().forEach(plugin.getKitManager()::give);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Everyone §7has been equipped!")));
+                MessageUtil.sendPrefixed(player, "Kit.EquipAll", Map.of());
                 return;
             }
 
             final Player target = Bukkit.getPlayer(args[0]);
             if (target == null) {
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("This player is not online!")));
+                MessageUtil.sendPrefixed(player, "Kit.PlayerOffline", Map.of());
                 return;
             }
 
             plugin.getKitManager().give(target);
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§a" + target.getName() + " §7has been equipped!")));
+            MessageUtil.sendPrefixed(player, "Kit.EquipPlayer", Map.of(
+                    "%player%", Component.text(target.getName())
+            ));
             return;
         }
 
@@ -48,48 +52,54 @@ public class KitCommand extends BukkitCommand {
 
             if (args[0].equalsIgnoreCase("enable")) {
                 if (!plugin.getKitManager().getKits().containsKey(kit)) {
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cThis kit does not exist!")));
+                    MessageUtil.sendPrefixed(player, "Kit.KitMissing", Map.of());
                     return;
                 }
 
                 plugin.getKitManager().enable(kit);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§a" + kit + " §7has been enabled!")));
+                MessageUtil.sendPrefixed(player, "Kit.KitEnabled", Map.of(
+                        "%kit%", Component.text(kit)
+                ));
                 return;
             }
 
             if (args[0].equalsIgnoreCase("save")) {
                 plugin.getKitManager().save(kit, player);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§a" + kit + " §7has been saved!")));
+                MessageUtil.sendPrefixed(player, "Kit.KitSaved", Map.of(
+                        "%kit%", Component.text(kit)
+                ));
                 return;
             }
 
             if (args[0].equalsIgnoreCase("delete")) {
                 if (!plugin.getKitManager().getKits().containsKey(kit)) {
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cThis kit does not exist!")));
+                    MessageUtil.sendPrefixed(player, "Kit.KitMissing", Map.of());
                     return;
                 }
 
                 if (plugin.getKitManager().getEnabledKit().equalsIgnoreCase(kit)) {
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cYou can't delete the enabled kit!")));
+                    MessageUtil.sendPrefixed(player, "Kit.KitDeleteEnabled", Map.of());
                     return;
                 }
 
                 plugin.getKitManager().delete(kit);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§a" + kit + " §7has been deleted!")));
+                MessageUtil.sendPrefixed(player, "Kit.KitDeleted", Map.of(
+                        "%kit%", Component.text(kit)
+                ));
                 return;
             }
         }
 
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/kit <player>")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/kit enable <kit>")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/kit save <kit>")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/kit delete <kit>")));
+        MessageUtil.sendPrefixed(player, "Kit.UsageGive", Map.of());
+        MessageUtil.sendPrefixed(player, "Kit.UsageEnable", Map.of());
+        MessageUtil.sendPrefixed(player, "Kit.UsageSave", Map.of());
+        MessageUtil.sendPrefixed(player, "Kit.UsageDelete", Map.of());
     }
 
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String alias, String[] args) throws IllegalArgumentException {
         if (!(sender instanceof final Player player)) return new ArrayList<>();
-        if (!(player.hasPermission("event.command.kit"))) return new ArrayList<>();
+        if (!player.hasPermission("event.command.kit")) return new ArrayList<>();
         final List<String> list = new ArrayList<>();
 
         if (args.length == 2) {

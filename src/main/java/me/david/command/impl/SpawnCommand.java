@@ -6,6 +6,8 @@ import me.david.util.MessageUtil;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
+import java.util.Map;
+
 public class SpawnCommand extends BukkitCommand {
 
     private final EventCore plugin;
@@ -20,12 +22,12 @@ public class SpawnCommand extends BukkitCommand {
         if (!(sender instanceof final Player player)) return;
 
         if (plugin.getMapManager().getSpawnLocation() == null) {
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cThere isn't a spawn location yet. Set one using the command /event setspawn")));
+            MessageUtil.sendPrefixed(player, "Spawn.MissingSpawn", Map.of());
             return;
         }
 
         if (plugin.getGameManager().isRunning() && !player.hasPermission("event.bypass")) {
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cYou cannot teleport to the spawn while the event is running")));
+            MessageUtil.sendPrefixed(player, "Spawn.Running", Map.of());
             return;
         }
 

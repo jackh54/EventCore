@@ -7,15 +7,16 @@ import me.david.api.events.game.GameStopEvent;
 import me.david.api.events.game.GameTimerTickEvent;
 import me.david.api.events.game.InGameTimerTickEvent;
 import me.david.util.BorderUtil;
+import me.david.util.ConfigCache;
 import me.david.util.MessageUtil;
 import me.david.util.PlayerUtil;
 import me.david.util.Scheduler;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Getter
@@ -41,7 +42,8 @@ public class GameManager {
         autoDropped = false;
         timerRunning = true;
 
-        timer = new AtomicInteger(EventCore.getInstance().getConfig().getInt("Messages.StartTimer.Timer", 5));
+        ConfigCache cache = ConfigCache.get();
+        timer = new AtomicInteger(cache.getStartTimerSeconds());
 
         GameStartEvent gameStartEvent = new GameStartEvent(timer.get());
         Bukkit.getPluginManager().callEvent(gameStartEvent);
@@ -55,43 +57,35 @@ public class GameManager {
             if (!timerRunning || running) return;
 
             int current = timer.get();
-
             Bukkit.getPluginManager().callEvent(new GameTimerTickEvent(current));
+
+            String color = cache.startTimerColor(current);
+            String timerText = color + current + "§7";
+            var replacements = Map.of(
+                    "%timer%", MessageUtil.translateColorCodes(timerText),
+                    "%prefix%", MessageUtil.getPrefix()
+            );
+
+            Component timerMessage = MessageUtil.getPrefix().append(
+                    MessageUtil.formatCached(cache.getStartTimerMessage(), replacements)
+            );
+            Title countdownTitle = Title.title(
+                    MessageUtil.formatCached(cache.getStartTimerTitle(), replacements),
+                    MessageUtil.formatCached(cache.getStartTimerSubTitle(), replacements)
+            );
+            Title startTitle = Title.title(
+                    MessageUtil.translateColorCodes(cache.getStartTitle()),
+                    MessageUtil.translateColorCodes(cache.getStartSubTitle())
+            );
 
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (current > 0) {
-                    String color = EventCore.getInstance().getConfig().getString("Messages.StartTimer.Colors." + current + "sec");
-                    String timerText = color + current + "§7";
-
-                    var replacements = Map.of(
-                            "%timer%", MessageUtil.translateColorCodes(timerText),
-                            "%prefix%", MessageUtil.getPrefix()
-                    );
-
-                    player.sendMessage(
-                            MessageUtil.getPrefix().append(
-                                    MessageUtil.format("Messages.StartTimer.Message", replacements)
-                            )
-                    );
-
-                    Title title = Title.title(
-                            MessageUtil.format("Messages.StartTimer.Title", replacements),
-                            MessageUtil.format("Messages.StartTimer.SubTitle", replacements)
-                    );
-                    player.showTitle(title);
-
+                    player.sendMessage(timerMessage);
+                    player.showTitle(countdownTitle);
                     player.playSound(player.getLocation(), Sound.ENTITY_CHICKEN_EGG, 5, 5);
                 } else {
-                    player.sendMessage(
-                            MessageUtil.getPrefix().append(MessageUtil.get("Messages.Start.Message"))
-                    );
-
-                    Title title = Title.title(
-                            MessageUtil.get("Messages.Start.Title"),
-                            MessageUtil.get("Messages.Start.SubTitle")
-                    );
-                    player.showTitle(title);
-
+                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes(cache.getStartMessage())));
+                    player.showTitle(startTitle);
                     player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 5, 5);
                 }
             }
@@ -101,8 +95,7 @@ public class GameManager {
                     world.setDifficulty(Difficulty.HARD);
                 }
 
-                if (EventCore.getInstance().getConfig().getBoolean("Settings.IngameTimer.Enabled")
-                        && !EventCore.getInstance().getConfig().getBoolean("Messages.Actionbar.Enabled")) {
+                if (cache.isIngameTimerEnabled() && !cache.isActionbarEnabled()) {
                     startInGameTimer();
                 }
 
@@ -158,30 +151,34 @@ public class GameManager {
 
         running = false;
         timerRunning = false;
-        BorderUtil.lastOptimal = 200;
+        BorderUtil.lastOptimal = BorderUtil.borderDefault;
 
         stopInGameTimer();
         stopAllTimers();
 
-        var replacements = Map.of(
-                "%winner%", MessageUtil.translateColorCodes(winner),
-                "%prefix%", MessageUtil.getPrefix()
-        );
+        ConfigCache cache = ConfigCache.get();
+        if (cache.isStopEnabled() && winner != null) {
+            var replacements = Map.of(
+                    "%winner%", MessageUtil.translateColorCodes(winner),
+                    "%prefix%", MessageUtil.getPrefix()
+            );
+
+            Component stopMessage = MessageUtil.getPrefix().append(
+                    MessageUtil.formatCached(cache.getStopMessage(), replacements)
+            );
+            Title stopTitle = Title.title(
+                    MessageUtil.formatCached(cache.getStopTitle(), replacements),
+                    MessageUtil.formatCached(cache.getStopSubTitle(), replacements)
+            );
+
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                player.sendMessage(stopMessage);
+                player.showTitle(stopTitle);
+                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 5, 5);
+            }
+        }
 
         for (Player player : Bukkit.getOnlinePlayers()) {
-            player.sendMessage(
-                    MessageUtil.getPrefix().append(
-                            MessageUtil.format("Messages.Stop.Message", replacements)
-                    )
-            );
-
-            Title title = Title.title(
-                    MessageUtil.format("Messages.Stop.Title", replacements),
-                    MessageUtil.format("Messages.Stop.SubTitle", replacements)
-            );
-            player.showTitle(title);
-
-            player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 5, 5);
             PlayerUtil.cleanPlayer(player);
         }
 
@@ -208,18 +205,19 @@ public class GameManager {
             timerTask = null;
         }
 
+        String format = ConfigCache.get().getIngameTimerFormat();
         timerTask = Scheduler.timer(() -> {
             inGameTimer++;
-
             Bukkit.getPluginManager().callEvent(new InGameTimerTickEvent(inGameTimer));
 
-            String raw = Objects.requireNonNull(EventCore.getInstance().getConfig().getString("Settings.IngameTimer.Format"))
+            String raw = format
                     .replace("hh", String.format("%02d", (inGameTimer / 3600)))
                     .replace("mm", String.format("%02d", ((inGameTimer % 3600) / 60)))
                     .replace("ss", String.format("%02d", (inGameTimer % 60)));
+            Component timerComponent = MessageUtil.translateColorCodes(raw);
 
             for (Player player : Bukkit.getOnlinePlayers()) {
-                player.sendActionBar(MessageUtil.translateColorCodes(raw));
+                player.sendActionBar(timerComponent);
             }
         }, 0, 20);
     }

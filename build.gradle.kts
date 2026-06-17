@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "me.david"
-version = "2.2"
+version = "2.3"
 description = "Event Server System with tons of useful commands and features"
 
 java {
@@ -57,14 +57,6 @@ tasks.processResources {
             "version" to project.version
         )
     }
-}
-
-tasks.shadowJar {
-    dependencies {
-        include(dependency("dev.jorel:commandapi-paper-shade"))
-    }
-
-    relocate("dev.jorel.commandapi", "me.david.libs.commandapi")
 }
 
 tasks {
