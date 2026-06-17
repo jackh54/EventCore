@@ -21,7 +21,8 @@ public class EntityDamageListener implements Listener {
 
         if (BorderUtil.isBoostEnabled()
                 && event.getCause() == EntityDamageEvent.DamageCause.WORLD_BORDER
-                && event.getEntity() instanceof Player player) {
+                && event.getEntity() instanceof Player player
+                && BorderUtil.shouldHandlePlayer(player)) {
             if (BorderUtil.hasSafeBoostSpace(player)) {
                 event.setCancelled(true);
                 return;

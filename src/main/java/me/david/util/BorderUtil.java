@@ -1,6 +1,7 @@
 package me.david.util;
 
 import me.david.EventCore;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
@@ -25,6 +26,8 @@ public class BorderUtil implements Runnable {
     public static boolean autoBorder;
 
     private static final int SAFE_PATH_CHECK_STEPS = 3;
+    private static final long BORDER_TICK_COOLDOWN_MS = 250L;
+    private static final Map<UUID, Long> LAST_BORDER_TICK = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> LAST_UNSAFE_DAMAGE = new ConcurrentHashMap<>();
 
     public BorderUtil() {
@@ -87,7 +90,7 @@ public class BorderUtil implements Runnable {
                 location.getWorld(),
                 center.getX() + (dx * scale),
                 location.getY(),
-                center.getZ() + (dz * scale),
+                location.getZ() + (dz * scale),
                 location.getYaw(),
                 location.getPitch()
         );
@@ -132,22 +135,27 @@ public class BorderUtil implements Runnable {
         return block.isPassable() || block.isLiquid();
     }
 
-    public static void tickOutsidePlayer(@NotNull Player player) {
-        if (!isBoostEnabled() || !isOutsideBorder(player.getLocation())) {
+    public static boolean shouldHandlePlayer(@NotNull Player player) {
+        return player.isValid() && !player.isDead() && player.getGameMode() == GameMode.SURVIVAL;
+    }
+
+    public static void handleOutsidePlayer(@NotNull Player player) {
+        if (!isBoostEnabled() || !shouldHandlePlayer(player) || !isOutsideBorder(player.getLocation())) {
             return;
         }
 
-        Scheduler.runForEntity(player, () -> {
-            if (!isOutsideBorder(player.getLocation())) {
-                return;
-            }
+        long now = System.currentTimeMillis();
+        UUID playerId = player.getUniqueId();
+        if (now - LAST_BORDER_TICK.getOrDefault(playerId, 0L) < BORDER_TICK_COOLDOWN_MS) {
+            return;
+        }
+        LAST_BORDER_TICK.put(playerId, now);
 
-            if (hasSafeBoostSpace(player)) {
-                applyBoost(player);
-            } else {
-                applyUnsafeDamage(player);
-            }
-        });
+        if (hasSafeBoostSpace(player)) {
+            applyBoost(player);
+        } else {
+            applyUnsafeDamage(player);
+        }
     }
 
     private static void applyBoost(@NotNull Player player) {
@@ -185,6 +193,11 @@ public class BorderUtil implements Runnable {
 
         DamageSource source = DamageSource.builder(DamageType.OUTSIDE_BORDER).build();
         player.damage(damage, source);
+    }
+
+    public static void clearPlayer(@NotNull UUID playerId) {
+        LAST_BORDER_TICK.remove(playerId);
+        LAST_UNSAFE_DAMAGE.remove(playerId);
     }
 
     public static void syncWorldBorder(@Nullable Location spawn) {

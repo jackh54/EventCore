@@ -6,12 +6,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 public class PlayerMoveListener implements Listener {
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.HIGH)
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (!BorderUtil.isBoostEnabled()) {
+        if (!BorderUtil.isBoostEnabled() || !BorderUtil.shouldHandlePlayer(event.getPlayer())) {
             return;
         }
 
@@ -21,11 +22,19 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
-        if (!BorderUtil.isInsideBorder(from) || BorderUtil.isInsideBorder(to)) {
+        if (BorderUtil.isInsideBorder(from) && BorderUtil.isOutsideBorder(to)) {
+            event.setTo(BorderUtil.clampInsideBorder(to));
             return;
         }
 
-        event.setTo(BorderUtil.clampInsideBorder(to));
+        if (BorderUtil.isOutsideBorder(to)) {
+            BorderUtil.handleOutsidePlayer(event.getPlayer());
+        }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        BorderUtil.clearPlayer(event.getPlayer().getUniqueId());
     }
 
 }
