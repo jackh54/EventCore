@@ -4,11 +4,15 @@ import me.david.EventCore;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.WorldBorder;
-import org.bukkit.entity.Entity;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.util.Vector;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class BorderUtil implements Runnable {
 
@@ -17,6 +21,8 @@ public class BorderUtil implements Runnable {
     public static double borderDamageAmount = 0.2;
     public static int lastOptimal = borderDefault;
     public static boolean autoBorder;
+
+    private static final Map<UUID, Long> LAST_UNSAFE_DAMAGE = new ConcurrentHashMap<>();
 
     public BorderUtil() {
         reload();
@@ -41,6 +47,10 @@ public class BorderUtil implements Runnable {
         return EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.Boost.Enabled", false);
     }
 
+    public static double getUnsafeDamage() {
+        return EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.UnsafeDamage", 4.0);
+    }
+
     public static @Nullable WorldBorder getBorder(@Nullable Location location) {
         if (location == null || location.getWorld() == null) {
             return null;
@@ -53,8 +63,59 @@ public class BorderUtil implements Runnable {
         return location != null && worldBorder != null && !worldBorder.isInside(location);
     }
 
-    public static void applyBoost(@NotNull Player player) {
+    public static boolean hasSafeBoostSpace(@NotNull Player player) {
+        Location location = player.getLocation();
+        if (!hasStandingRoom(location)) {
+            return false;
+        }
+
+        WorldBorder worldBorder = player.getWorld().getWorldBorder();
+        Location center = worldBorder.getCenter();
+        Vector toCenter = center.toVector().subtract(location.toVector());
+        toCenter.setY(0);
+        if (toCenter.lengthSquared() < 0.0001) {
+            return true;
+        }
+
+        Location step = location.clone().add(toCenter.normalize());
+        return hasStandingRoom(step);
+    }
+
+    private static boolean hasStandingRoom(@NotNull Location location) {
+        World world = location.getWorld();
+        int x = location.getBlockX();
+        int y = location.getBlockY();
+        int z = location.getBlockZ();
+
+        Block feet = world.getBlockAt(x, y, z);
+        Block head = world.getBlockAt(x, y + 1, z);
+        return isPassable(feet) && isPassable(head);
+    }
+
+    private static boolean isPassable(@NotNull Block block) {
+        return block.isPassable() || block.isLiquid();
+    }
+
+    public static void handleOutsideBorder(@NotNull Player player) {
         if (!isBoostEnabled()) {
+            return;
+        }
+
+        Scheduler.runForEntity(player, () -> {
+            if (!isOutsideBorder(player.getLocation())) {
+                return;
+            }
+
+            if (hasSafeBoostSpace(player)) {
+                applyBoost(player);
+            } else {
+                applyUnsafeDamage(player);
+            }
+        });
+    }
+
+    public static void applyBoost(@NotNull Player player) {
+        if (!isBoostEnabled() || !hasSafeBoostSpace(player)) {
             return;
         }
 
@@ -83,6 +144,22 @@ public class BorderUtil implements Runnable {
         });
     }
 
+    public static void applyUnsafeDamage(@NotNull Player player) {
+        double damage = getUnsafeDamage();
+        if (damage <= 0) {
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        UUID playerId = player.getUniqueId();
+        if (now - LAST_UNSAFE_DAMAGE.getOrDefault(playerId, 0L) < 500L) {
+            return;
+        }
+        LAST_UNSAFE_DAMAGE.put(playerId, now);
+
+        Scheduler.runForEntity(player, () -> player.damage(damage));
+    }
+
     public static void syncWorldBorder(@Nullable Location spawn) {
         if (spawn == null || spawn.getWorld() == null) {
             return;
@@ -93,7 +170,7 @@ public class BorderUtil implements Runnable {
         border.setCenter(spawn.getX(), spawn.getZ());
         border.setSize(borderDefault);
         border.setDamageBuffer(borderDamageBuffer);
-        border.setDamageAmount(isBoostEnabled() ? 0 : borderDamageAmount);
+        border.setDamageAmount(borderDamageAmount);
     }
 
     public static void syncAllWorldBorders(@Nullable Location spawn) {
@@ -107,7 +184,7 @@ public class BorderUtil implements Runnable {
             WorldBorder border = world.getWorldBorder();
             border.setSize(borderDefault);
             border.setDamageBuffer(borderDamageBuffer);
-            border.setDamageAmount(isBoostEnabled() ? 0 : borderDamageAmount);
+            border.setDamageAmount(borderDamageAmount);
         }
     }
 

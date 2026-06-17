@@ -23,11 +23,20 @@ public class EntityDamageListener implements Listener {
             return;
         }
 
-        if (!(event.getEntity() instanceof Player)) return;
-
-        if (BorderUtil.isBoostEnabled() && event.getCause() == EntityDamageEvent.DamageCause.WORLD_BORDER) {
-            event.setCancelled(true);
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
         }
+
+        if (!BorderUtil.isBoostEnabled() || event.getCause() != EntityDamageEvent.DamageCause.WORLD_BORDER) {
+            return;
+        }
+
+        if (BorderUtil.hasSafeBoostSpace(player)) {
+            event.setCancelled(true);
+            return;
+        }
+
+        event.setDamage(Math.max(event.getDamage(), BorderUtil.getUnsafeDamage()));
     }
 
 }

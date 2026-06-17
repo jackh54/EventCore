@@ -179,7 +179,7 @@ public class EventCore extends JavaPlugin {
         borderBoostTask = Scheduler.timer(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 if (BorderUtil.isOutsideBorder(player.getLocation())) {
-                    BorderUtil.applyBoost(player);
+                    BorderUtil.handleOutsideBorder(player);
                 }
             }
         }, 1, 10);
