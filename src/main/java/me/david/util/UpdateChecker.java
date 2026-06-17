@@ -34,10 +34,9 @@ public class UpdateChecker {
     public UpdateChecker(JavaPlugin plugin, String owner, String repo) {
         this.plugin = plugin;
         this.apiUrl = String.format("https://api.github.com/repos/%s/%s/releases/latest", owner, repo);
-        this.currentVer = normalize(plugin.getDescription().getVersion());
+        this.currentVer = normalize(plugin.getPluginMeta().getVersion());
     }
 
-    @SuppressWarnings("deprecation")
     public void check() {
         Thread.ofVirtual().start(() -> {
             try {

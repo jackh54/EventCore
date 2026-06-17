@@ -3,14 +3,15 @@ package me.david.command.impl;
 import me.david.command.BukkitCommand;
 import me.david.util.MessageUtil;
 import me.david.util.PlayerUtil;
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 public class ReviveCommand extends BukkitCommand {
 
@@ -25,28 +26,30 @@ public class ReviveCommand extends BukkitCommand {
         if (args.length == 1) {
             if (args[0].equalsIgnoreCase("*")) {
                 Bukkit.getOnlinePlayers().forEach(PlayerUtil::cleanPlayer);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§aEveryone §7has been revived!")));
+                MessageUtil.sendPrefixed(player, "Revive.ReviveAll", Map.of());
                 return;
             }
 
             final Player target = Bukkit.getPlayer(args[0]);
             if (target == null) {
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§cThis player is not online!")));
+                MessageUtil.sendPrefixed(player, "Revive.PlayerOffline", Map.of());
                 return;
             }
 
             PlayerUtil.cleanPlayer(target);
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§a" + target.getName() + " §7has been revived!")));
+            MessageUtil.sendPrefixed(player, "Revive.RevivePlayer", Map.of(
+                    "%player%", Component.text(target.getName())
+            ));
             return;
         }
 
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/revive <player>")));
+        MessageUtil.sendPrefixed(player, "Revive.Usage", Map.of());
     }
 
     @Override
     public @NotNull List<String> tabComplete(@NotNull CommandSender sender, @NotNull String alias, String[] args) throws IllegalArgumentException {
         if (!(sender instanceof final Player player)) return new ArrayList<>();
-        if (!(player.hasPermission("event.command.revive"))) return new ArrayList<>();
+        if (!player.hasPermission("event.command.revive")) return new ArrayList<>();
 
         List<String> list = new ArrayList<>();
 
@@ -55,9 +58,6 @@ public class ReviveCommand extends BukkitCommand {
             list.add("*");
         }
 
-        try {
-            Collections.sort(list);
-        } catch (Exception ignored) { }
         return list.stream().filter(content -> content.toLowerCase().startsWith(args[args.length - 1].toLowerCase())).sorted().toList();
     }
 

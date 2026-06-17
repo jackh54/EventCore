@@ -29,10 +29,8 @@ public final class PlaceholderHook extends PlaceholderExpansion {
         return "VertrauterDavid & JavaMio";
     }
 
-    @Override
-    @SuppressWarnings("deprecation")
     public @NotNull String getVersion() {
-        return EventCore.getInstance().getDescription().getVersion();
+        return EventCore.getInstance().getPluginMeta().getVersion();
     }
 
     @Override

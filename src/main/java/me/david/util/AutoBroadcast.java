@@ -10,15 +10,16 @@ import java.util.List;
 public class AutoBroadcast implements Runnable {
 
     private final List<String> messages;
-    private int index = 0;
+    private int index;
 
     public AutoBroadcast() {
-        messages = EventCore.getInstance().getConfig().getStringList("AutoBroadcast.Messages");
+        messages = ConfigCache.get().getAutoBroadcastMessages();
     }
 
     @Override
     public void run() {
-        if (!(EventCore.getInstance().getConfig().getBoolean("AutoBroadcast.Enabled")) || messages.isEmpty()) {
+        ConfigCache cache = ConfigCache.get();
+        if (!cache.isAutoBroadcastEnabled() || messages.isEmpty()) {
             return;
         }
 
@@ -26,20 +27,20 @@ public class AutoBroadcast implements Runnable {
             index = 0;
         }
 
-        String message = messages.get(index);
-        if (EventCore.getInstance().getConfig().getBoolean("AutoBroadcast.UseBroadcastCommand")) {
-            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), EventCore.getInstance().getConfig().getString("AutoBroadcast.BroadcastCommand", "").replaceAll("%message%", message));
-        } else {
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.sendMessage(Component.empty());
-                player.sendMessage(Component.empty());
-                player.sendMessage(MessageUtil.translateColorCodes(message));
-                player.sendMessage(Component.empty());
-                player.sendMessage(Component.empty());
-            }
+        String message = messages.get(index++);
+        Component component = MessageUtil.translateColorCodes(message);
+
+        if (cache.isAutoBroadcastUseCommand()) {
+            String command = cache.getAutoBroadcastCommand().replace("%message%", message);
+            Scheduler.dispatchCommand(() -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command));
+            return;
         }
 
-        index++;
+        Scheduler.runSync(() -> {
+            for (Player player : Bukkit.getOnlinePlayers()) {
+                player.sendMessage(component);
+            }
+        });
     }
 
 }

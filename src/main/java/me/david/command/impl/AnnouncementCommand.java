@@ -3,7 +3,6 @@ package me.david.command.impl;
 import me.david.EventCore;
 import me.david.command.BukkitCommand;
 import me.david.util.MessageUtil;
-import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
@@ -25,29 +24,30 @@ public class AnnouncementCommand extends BukkitCommand {
 
     @Override
     public void onCommand(CommandSender sender, String label, String[] args) {
-        if (!(sender.hasPermission("event.command"))) return;
+        if (!sender.hasPermission("event.command")) return;
 
-        if (args.length >= 1) {
-            String message = String.join(" ", args);
-            var replacements = Map.of(
-                    "%prefix%", MessageUtil.getPrefix(),
-                    "%message%", MessageUtil.translateColorCodes(message)
-            );
-
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                player.sendMessage(MessageUtil.format("Messages.AnnoucementCommand.MessageFormat", replacements));
-
-                if (plugin.getConfig().getBoolean("Messages.AnnoucementCommand.Title.Enabled")) {
-                    Component titleComponent = MessageUtil.format("Messages.AnnoucementCommand.Title.Title", replacements);
-                    Component subTitleComponent = MessageUtil.format("Messages.AnnoucementCommand.Title.SubTitle", replacements);
-
-                    Title title = Title.title(titleComponent, subTitleComponent);
-                    player.showTitle(title);
-                }
-            }
+        if (args.length == 0) {
+            MessageUtil.sendPrefixed(sender, "Announcement.Usage", Map.of());
+            return;
         }
 
-        sender.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: Â§c/annoucement <message>")));
+        String message = String.join(" ", args);
+        var replacements = Map.of(
+                "%prefix%", MessageUtil.getPrefix(),
+                "%message%", MessageUtil.translateColorCodes(message)
+        );
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            player.sendMessage(MessageUtil.format("Messages.AnnoucementCommand.MessageFormat", replacements));
+
+            if (plugin.getConfig().getBoolean("Messages.AnnoucementCommand.Title.Enabled")) {
+                Title title = Title.title(
+                        MessageUtil.format("Messages.AnnoucementCommand.Title.Title", replacements),
+                        MessageUtil.format("Messages.AnnoucementCommand.Title.SubTitle", replacements)
+                );
+                player.showTitle(title);
+            }
+        }
     }
 
     @Override

@@ -15,6 +15,7 @@ import org.bukkit.entity.Player;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class EventCommand extends BukkitCommand {
 
@@ -34,134 +35,122 @@ public class EventCommand extends BukkitCommand {
         if (!(sender instanceof final Player player)) return;
 
         if (args.length == 0) {
-            player.sendMessage(" ");
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§7Running §aEventCore §7v" + plugin.getPluginMeta().getVersion() + " §7on §a" + getSoftware())));
-            player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§7Download at §ahttps://github.com/VertrauterDavid")));
-            player.sendMessage(" ");
+            player.sendMessage(Component.empty());
+            MessageUtil.sendPrefixed(player, "Event.InfoVersion", Map.of(
+                    "%version%", Component.text(plugin.getPluginMeta().getVersion()),
+                    "%platform%", Component.text(getSoftware())
+            ));
+            MessageUtil.sendPrefixed(player, "Event.InfoDownload", Map.of());
+            player.sendMessage(Component.empty());
+            return;
         }
 
         if (args.length == 1) {
-            if (args[0].equalsIgnoreCase("start")) {
-                plugin.getGameManager().start();
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("stop")) {
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event stop <winner>")));
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("drop")) {
-                plugin.getMapManager().drop();
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("reset")) {
-                plugin.getMapManager().reset();
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("reload")) {
-                double currentMS = System.currentTimeMillis();
-                plugin.reloadConfig();
-                double reloadMS = System.currentTimeMillis() - currentMS;
-
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§aYou successfully reloaded the config within %ms%ms!").replaceText(b -> b.matchLiteral("%ms%").replacement(Component.text(String.valueOf(reloadMS))))));
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("setSpawn")) {
-                plugin.getMapManager().saveSpawnLocation(player);
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("§aSpawn location saved!")));
-                player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 5, 5);
-                player.closeInventory();
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("kickspec")) {
-                for (final Player target : Bukkit.getOnlinePlayers()) {
-                    if (!(target.hasPermission("event.spec")) && target.getGameMode() == GameMode.SPECTATOR) {
-                        target.kick();
-                    }
-                }
-
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("All spectators has been kicked!")));
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("kickall")) {
-                for (final Player target : Bukkit.getOnlinePlayers()) {
-                    if (!(target.hasPermission("event.spec"))) {
-                        target.kick();
-                    }
-                }
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("All players has been kicked!")));
-                return;
-            }
-
-            if (args[0].equalsIgnoreCase("clearall")) {
-                for (final Player target : Bukkit.getOnlinePlayers()) {
-                    target.getInventory().setArmorContents(null);
-                    target.getInventory().clear();
-                }
-                player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("All players has been cleared!")));
-                return;
-            }
-        }
-
-        if (args.length == 2) {
-            if (args[0].equalsIgnoreCase("autoBorder")) {
-                if (args[1].equalsIgnoreCase("on")) {
-                    BorderUtil.setAutoBorder(true);
-
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("AutoBorder has been §aactivated!")));
+            switch (args[0].toLowerCase()) {
+                case "start" -> {
+                    plugin.getGameManager().start();
                     return;
                 }
-
-                if (args[1].equalsIgnoreCase("off")) {
-                    BorderUtil.setAutoBorder(false);
-                    BorderUtil.lastOptimal = BorderUtil.borderDefault;
-
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("AutoBorder has been §cdeactivated!")));
+                case "stop" -> {
+                    MessageUtil.sendPrefixed(player, "Event.StopUsage", Map.of());
+                    return;
+                }
+                case "drop" -> {
+                    plugin.getMapManager().drop();
+                    return;
+                }
+                case "reset" -> {
+                    plugin.getMapManager().reset();
+                    return;
+                }
+                case "reload" -> {
+                    long start = System.currentTimeMillis();
+                    plugin.reloadRuntimeConfig();
+                    long reloadMs = System.currentTimeMillis() - start;
+                    MessageUtil.sendPrefixed(player, "Event.ReloadSuccess", Map.of(
+                            "%ms%", Component.text(String.valueOf(reloadMs))
+                    ));
+                    return;
+                }
+                case "setspawn" -> {
+                    plugin.getMapManager().saveSpawnLocation(player);
+                    MessageUtil.sendPrefixed(player, "Event.SpawnSaved", Map.of());
+                    player.playSound(player.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, 5, 5);
+                    player.closeInventory();
+                    return;
+                }
+                case "kickspec" -> {
+                    for (final Player target : Bukkit.getOnlinePlayers()) {
+                        if (!target.hasPermission("event.spec") && target.getGameMode() == GameMode.SPECTATOR) {
+                            target.kick();
+                        }
+                    }
+                    MessageUtil.sendPrefixed(player, "Event.KickspecSuccess", Map.of());
+                    return;
+                }
+                case "kickall" -> {
+                    for (final Player target : Bukkit.getOnlinePlayers()) {
+                        if (!target.hasPermission("event.spec")) {
+                            target.kick();
+                        }
+                    }
+                    MessageUtil.sendPrefixed(player, "Event.KickallSuccess", Map.of());
+                    return;
+                }
+                case "clearall" -> {
+                    for (final Player target : Bukkit.getOnlinePlayers()) {
+                        target.getInventory().setArmorContents(null);
+                        target.getInventory().clear();
+                    }
+                    MessageUtil.sendPrefixed(player, "Event.ClearallSuccess", Map.of());
                     return;
                 }
             }
         }
 
-        if (args.length >= 2) {
-            if (args[0].equalsIgnoreCase("stop")) {
-                StringBuilder winner = null;
-                for (int i = 1; i < args.length; i++) {
-                    if (winner == null) {
-                        winner = new StringBuilder(args[i]);
-                    } else {
-                        winner.append(" ").append(args[i]);
-                    }
-                }
+        if (args.length == 2 && args[0].equalsIgnoreCase("autoBorder")) {
+            if (args[1].equalsIgnoreCase("on")) {
+                BorderUtil.setAutoBorder(true);
+                MessageUtil.sendPrefixed(player, "Event.AutoBorderOn", Map.of());
+                return;
+            }
 
-                plugin.getGameManager().stop(winner.toString());
+            if (args[1].equalsIgnoreCase("off")) {
+                BorderUtil.setAutoBorder(false);
+                BorderUtil.lastOptimal = BorderUtil.borderDefault;
+                MessageUtil.sendPrefixed(player, "Event.AutoBorderOff", Map.of());
                 return;
             }
         }
 
-        player.sendMessage(" ");
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event start")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event stop <winner>")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event drop")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event reset")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event autoBorder <on / off>")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event setSpawn")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event reload")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event kickspec")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: §c/event kickall")));
-        player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("Usage: &c/event clearall")));
-        player.sendMessage(" ");
+        if (args.length >= 2 && args[0].equalsIgnoreCase("stop")) {
+            String winner = String.join(" ", Arrays.copyOfRange(args, 1, args.length));
+            plugin.getGameManager().stop(winner);
+            return;
+        }
+
+        sendUsage(player);
+    }
+
+    private void sendUsage(Player player) {
+        player.sendMessage(Component.empty());
+        MessageUtil.sendPrefixed(player, "Event.UsageStart", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageStop", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageDrop", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageReset", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageAutoBorder", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageSetSpawn", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageReload", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageKickspec", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageKickall", Map.of());
+        MessageUtil.sendPrefixed(player, "Event.UsageClearall", Map.of());
+        player.sendMessage(Component.empty());
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, String label, String[] args) {
         if (!(sender instanceof final Player player)) return new ArrayList<>();
-        if (!(player.hasPermission("event.command"))) return new ArrayList<>();
+        if (!player.hasPermission("event.command")) return new ArrayList<>();
 
         List<String> list = new ArrayList<>();
 

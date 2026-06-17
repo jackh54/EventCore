@@ -17,11 +17,14 @@ public class PlayerJoinListener implements Listener {
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
         final Player player = event.getPlayer();
+        ConfigCache cache = ConfigCache.get();
 
         HostUtil.giveHost(player);
 
-        if (EventCore.getInstance().getConfig().getBoolean("Messages.PlayerJoin.Enabled")) {
-            Component message = MessageUtil.getPrefix().append(MessageUtil.format("Messages.PlayerJoin.Message", Map.of("%player%", Component.text(player.getName()))));
+        if (cache.isPlayerJoinEnabled()) {
+            Component message = MessageUtil.getPrefix().append(
+                    MessageUtil.formatCached(cache.getPlayerJoinMessage(), Map.of("%player%", Component.text(player.getName())))
+            );
             event.joinMessage(message);
         } else {
             event.joinMessage(Component.empty());
@@ -34,6 +37,7 @@ public class PlayerJoinListener implements Listener {
             player.getInventory().clear();
             player.setGameMode(GameMode.SPECTATOR);
         }
+
         Scheduler.wait(() -> {
             player.teleportAsync(EventCore.getInstance().getMapManager().getSpawnLocation());
             if (EventCore.getInstance().getGameManager().isRunning()) {
@@ -41,18 +45,18 @@ public class PlayerJoinListener implements Listener {
             }
         }, 2);
 
-        if (player.hasPermission("event.notify") && EventCore.getInstance().getConfig().getBoolean("Settings.Updates.NotifyOnJoin")) {
+        if (player.hasPermission("event.notify") && cache.isUpdateNotifyOnJoin()) {
             UpdateChecker updateChecker = new UpdateChecker(EventCore.getInstance(), "DavidArchive", "EventCore");
             updateChecker.check();
 
-            Bukkit.getScheduler().runTaskLater(EventCore.getInstance(), () -> {
+            Scheduler.wait(() -> {
                 if (updateChecker.isHasUpdate()) {
                     player.sendMessage(Component.empty());
-                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes("You're running an outdated version of EventCore. Please update to the latest version:")));
+                    player.sendMessage(MessageUtil.getPrefix().append(MessageUtil.translateColorCodes(cache.getUpdateOutdatedMessage())));
                     player.sendMessage(updateChecker.getUpdateComponent());
                     player.sendMessage(Component.empty());
                 }
-            }, 20L);
+            }, 20);
         }
     }
 

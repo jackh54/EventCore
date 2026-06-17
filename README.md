@@ -15,7 +15,7 @@
 ## Update
 1. Download the new jar from [here](https://github.com/DavidArchive/EventCore/releases/latest)
 2. Replace the old jar with the new one
-3. Delete the old `config.yml` and restart your server
+3. Restart your server (reload is supported via `/event reload` for config and messages)
 
 ---
 

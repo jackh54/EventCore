@@ -1,6 +1,6 @@
 package me.david.listener;
 
-import me.david.EventCore;
+import me.david.util.ConfigCache;
 import me.david.util.MessageUtil;
 import me.david.util.PlayerUtil;
 import net.kyori.adventure.text.Component;
@@ -23,16 +23,17 @@ public class PlayerDeathListener implements Listener {
             return;
         }
 
-        if (EventCore.getInstance().getConfig().getBoolean("Messages.PlayerDeath.Enabled")) {
+        ConfigCache cache = ConfigCache.get();
+        if (cache.isPlayerDeathEnabled()) {
             if (player.getKiller() != null) {
-                event.deathMessage(MessageUtil.format("Messages.PlayerDeath.Message1", Map.of(
-                                "%player%", Component.text(player.getName()),
-                                "%killer%", Component.text(player.getKiller().getName()))
-                ));
+                event.deathMessage(MessageUtil.formatCached(cache.getPlayerDeathMessage1(), Map.of(
+                        "%player%", Component.text(player.getName()),
+                        "%killer%", Component.text(player.getKiller().getName())
+                )));
             } else {
-                event.deathMessage(MessageUtil.format(
-                        "Messages.PlayerDeath.Message2", Map.of("%player%", Component.text(player.getName()))
-                ));
+                event.deathMessage(MessageUtil.formatCached(cache.getPlayerDeathMessage2(), Map.of(
+                        "%player%", Component.text(player.getName())
+                )));
             }
         } else {
             event.deathMessage(Component.empty());

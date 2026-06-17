@@ -63,6 +63,9 @@ Settings:
 
 Messages:
   Prefix: "&8 | &#559effEvent &8» &7"
+  NoPermission: "&cYou don't have permission to use this command!"
+  Updates:
+    Outdated: "&7You're running an outdated version of EventCore. Please update to the latest version:"
   PlayerJoin:
     Enabled: true
     Message: "&a%player% &7joined the Event!"
@@ -102,6 +105,53 @@ Messages:
       Enabled: true
       Title: "&#559eff&lANNOUNCEMENT" # 1st row
       SubTitle: "&7%message%" # 2nd row
+  Commands:
+    Event:
+      InfoVersion: "&7Running &aEventCore &7v%version% &7on &a%platform%"
+      InfoDownload: "&7Download at &ahttps://github.com/DavidArchive/EventCore"
+      StopUsage: "&cUsage: /event stop <winner>"
+      ReloadSuccess: "&aYou successfully reloaded the config within %ms%ms!"
+      SpawnSaved: "&aSpawn location saved!"
+      KickspecSuccess: "&aAll spectators have been kicked!"
+      KickallSuccess: "&aAll players have been kicked!"
+      ClearallSuccess: "&aAll player inventories have been cleared!"
+      AutoBorderOn: "&aAutoBorder has been activated!"
+      AutoBorderOff: "&cAutoBorder has been deactivated!"
+      UsageStart: "&cUsage: /event start"
+      UsageStop: "&cUsage: /event stop <winner>"
+      UsageDrop: "&cUsage: /event drop"
+      UsageReset: "&cUsage: /event reset"
+      UsageAutoBorder: "&cUsage: /event autoBorder <on / off>"
+      UsageSetSpawn: "&cUsage: /event setSpawn"
+      UsageReload: "&cUsage: /event reload"
+      UsageKickspec: "&cUsage: /event kickspec"
+      UsageKickall: "&cUsage: /event kickall"
+      UsageClearall: "&cUsage: /event clearall"
+    Kit:
+      EquipAll: "&aEveryone &7has been equipped!"
+      PlayerOffline: "&cThis player is not online!"
+      EquipPlayer: "&a%player% &7has been equipped!"
+      KitMissing: "&cThis kit does not exist!"
+      KitEnabled: "&a%kit% &7has been enabled!"
+      KitSaved: "&a%kit% &7has been saved!"
+      KitDeleteEnabled: "&cYou can't delete the enabled kit!"
+      KitDeleted: "&a%kit% &7has been deleted!"
+      SaveSuccess: "&aKit saved successfully!"
+      SaveFailed: "&cFailed to save kit!"
+      UsageGive: "&cUsage: /kit <player>"
+      UsageEnable: "&cUsage: /kit enable <kit>"
+      UsageSave: "&cUsage: /kit save <kit>"
+      UsageDelete: "&cUsage: /kit delete <kit>"
+    Revive:
+      ReviveAll: "&aEveryone &7has been revived!"
+      PlayerOffline: "&cThis player is not online!"
+      RevivePlayer: "&a%player% &7has been revived!"
+      Usage: "&cUsage: /revive <player>"
+    Spawn:
+      MissingSpawn: "&cThere isn't a spawn location yet. Set one using /event setSpawn"
+      Running: "&cYou cannot teleport to the spawn while the event is running"
+    Announcement:
+      Usage: "&cUsage: /announce <message>"
 
 AutoBroadcast: # Messages that are automatically broadcasted
   Enabled: true

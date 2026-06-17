@@ -8,12 +8,18 @@ public class BorderUtil implements Runnable {
     public static double borderDamageBuffer = 0.0;
     public static double borderDamageAmount = 0.2;
     public static int lastOptimal = borderDefault;
-    public static boolean autoBorder = EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.AutoBorder", false);
+    public static boolean autoBorder;
 
     public BorderUtil() {
-        borderDefault = EventCore.getInstance().getConfig().getInt("Settings.WorldBorder.DefaultSize", borderDefault);
-        borderDamageBuffer = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Damage.Buffer", borderDamageBuffer);
-        borderDamageAmount = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Damage.Amount", borderDamageAmount);
+        reload();
+    }
+
+    public static void reload() {
+        var config = EventCore.getInstance().getConfig();
+        borderDefault = config.getInt("Settings.WorldBorder.DefaultSize", borderDefault);
+        borderDamageBuffer = config.getDouble("Settings.WorldBorder.Damage.Buffer", borderDamageBuffer);
+        borderDamageAmount = config.getDouble("Settings.WorldBorder.Damage.Amount", borderDamageAmount);
+        autoBorder = config.getBoolean("Settings.WorldBorder.AutoBorder", false);
         lastOptimal = borderDefault;
     }
 
@@ -23,22 +29,37 @@ public class BorderUtil implements Runnable {
         EventCore.getInstance().saveConfig();
     }
 
-
     @Override
     public void run() {
-        if (EventCore.getInstance().getGameManager().isRunning() && autoBorder) {
-            double current = EventCore.getInstance().getMapManager().getSpawnLocation().getWorld().getWorldBorder().getSize();
-            int optimal = getOptimalSize();
-            if (lastOptimal > optimal) {
-                lastOptimal = optimal;
-                Scheduler.runSync(() -> EventCore.getInstance().getMapManager().getSpawnLocation().getWorld().getWorldBorder().setSize(optimal, (long) (current - optimal)));
-            }
+        if (!EventCore.getInstance().getGameManager().isRunning() || !autoBorder) {
+            return;
         }
+
+        var spawnLocation = EventCore.getInstance().getMapManager().getSpawnLocation();
+        if (spawnLocation == null || spawnLocation.getWorld() == null) {
+            return;
+        }
+
+        int optimal = getOptimalSize();
+        if (lastOptimal <= optimal) {
+            return;
+        }
+
+        lastOptimal = optimal;
+        Scheduler.runSync(() -> {
+            var world = spawnLocation.getWorld();
+            if (world == null) {
+                return;
+            }
+            double current = world.getWorldBorder().getSize();
+            world.getWorldBorder().setSize(optimal, (long) Math.max(1, current - optimal));
+        });
     }
 
     private int getOptimalSize() {
-        int optimal = (int) (((Math.pow(PlayerUtil.getAlive(), 2)) / 60 + 4 + 0.6 * PlayerUtil.getAlive()) * 2);
-        return Math.min(200, optimal);
+        int alive = PlayerUtil.getAlive();
+        int optimal = (int) (((Math.pow(alive, 2)) / 60 + 4 + 0.6 * alive) * 2);
+        return Math.min(borderDefault, optimal);
     }
 
 }

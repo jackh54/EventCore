@@ -1,6 +1,6 @@
 package me.david.listener;
 
-import me.david.EventCore;
+import me.david.util.ConfigCache;
 import me.david.util.HostUtil;
 import me.david.util.MessageUtil;
 import net.kyori.adventure.text.Component;
@@ -16,11 +16,13 @@ public class PlayerQuitListener implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         final Player player = event.getPlayer();
-
         HostUtil.removeHost(player);
+        ConfigCache cache = ConfigCache.get();
 
-        if (EventCore.getInstance().getConfig().getBoolean("Messages.PlayerQuit.Enabled")) {
-            Component message = MessageUtil.format("Messages.PlayerQuit.Message", Map.of("%player%", Component.text(player.getName())));
+        if (cache.isPlayerQuitEnabled()) {
+            Component message = MessageUtil.formatCached(cache.getPlayerQuitMessage(), Map.of(
+                    "%player%", Component.text(player.getName())
+            ));
             event.quitMessage(message);
         } else {
             event.quitMessage(Component.empty());
