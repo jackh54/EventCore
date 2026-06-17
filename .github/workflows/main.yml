@@ -1,23 +1,34 @@
-name: Publish project to Maven repository
+name: Build and publish artifact
+
 on:
   push:
-    branches: [ main ]
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
+
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      - name: Create gradle.properties
-        run: |
-          mkdir -p ~/.gradle
-          echo "allayUsername=${{ secrets.MAVEN_NAME }}" >> ~/.gradle/gradle.properties
-          echo "allayPassword=${{ secrets.MAVEN_SECRET }}" >> ~/.gradle/gradle.properties
-      - name: Publish with Gradle
-        run: ./gradlew build publish
+
+      - name: Build plugin JAR
+        run: ./gradlew build --no-daemon
+
+      - name: Upload plugin JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: EventCore-jar
+          path: build/libs/EventCore-*-all.jar
+          if-no-files-found: error
