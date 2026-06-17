@@ -28,6 +28,11 @@ public class PlayerMoveListener implements Listener {
         }
 
         if (BorderUtil.isOutsideBorder(to)) {
+            if (BorderUtil.isFarOutsideBorder(to)) {
+                event.setTo(BorderUtil.clampInsideBorder(to));
+                return;
+            }
+
             BorderUtil.handleOutsidePlayer(event.getPlayer());
         }
     }

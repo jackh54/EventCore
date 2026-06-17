@@ -73,6 +73,21 @@ public class BorderUtil implements Runnable {
         return !isInsideBorder(location);
     }
 
+    public static double getDistanceBeyondBorder(@NotNull Location location) {
+        WorldBorder worldBorder = location.getWorld().getWorldBorder();
+        Location center = worldBorder.getCenter();
+        double halfSize = worldBorder.getSize() / 2.0;
+
+        double dx = location.getX() - center.getX();
+        double dz = location.getZ() - center.getZ();
+        double horizontalDistance = Math.hypot(dx, dz);
+        return Math.max(0, horizontalDistance - halfSize);
+    }
+
+    public static boolean isFarOutsideBorder(@NotNull Location location) {
+        return getDistanceBeyondBorder(location) > 2.0;
+    }
+
     public static @NotNull Location clampInsideBorder(@NotNull Location location) {
         WorldBorder worldBorder = location.getWorld().getWorldBorder();
         Location center = worldBorder.getCenter();
@@ -144,6 +159,12 @@ public class BorderUtil implements Runnable {
             return;
         }
 
+        Location location = player.getLocation();
+        if (isFarOutsideBorder(location)) {
+            player.teleportAsync(clampInsideBorder(location));
+            return;
+        }
+
         long now = System.currentTimeMillis();
         UUID playerId = player.getUniqueId();
         if (now - LAST_BORDER_TICK.getOrDefault(playerId, 0L) < BORDER_TICK_COOLDOWN_MS) {
@@ -156,6 +177,22 @@ public class BorderUtil implements Runnable {
         } else {
             applyUnsafeDamage(player);
         }
+    }
+
+    public static @Nullable Location resolvePearlDestination(@Nullable Location from, @Nullable Location to) {
+        if (to == null) {
+            return null;
+        }
+
+        if (!isOutsideBorder(to)) {
+            return to;
+        }
+
+        if (from != null && isInsideBorder(from)) {
+            return clampInsideBorder(to);
+        }
+
+        return null;
     }
 
     private static void applyBoost(@NotNull Player player) {

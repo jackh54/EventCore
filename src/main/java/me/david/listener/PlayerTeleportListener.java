@@ -4,14 +4,15 @@ import me.david.EventCore;
 import me.david.util.BorderUtil;
 import org.bukkit.Location;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
 public class PlayerTeleportListener implements Listener {
 
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerTeleport(PlayerTeleportEvent event) {
-        if (!EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.DisableEnderPeals")) {
+        if (!BorderUtil.shouldHandlePlayer(event.getPlayer())) {
             return;
         }
 
@@ -19,14 +20,20 @@ public class PlayerTeleportListener implements Listener {
             return;
         }
 
-        Location to = event.getTo();
-        if (to == null || to.getWorld() == null) {
+        if (!EventCore.getInstance().getConfig().getBoolean("Settings.WorldBorder.DisableEnderPeals")) {
             return;
         }
 
-        if (BorderUtil.isOutsideBorder(to)) {
-            event.setCancelled(true);
+        Location to = event.getTo();
+        Location resolved = BorderUtil.resolvePearlDestination(event.getFrom(), to);
+        if (resolved == null) {
+            if (to != null && BorderUtil.isOutsideBorder(to)) {
+                event.setCancelled(true);
+            }
+            return;
         }
+
+        event.setTo(resolved);
     }
 
 }
