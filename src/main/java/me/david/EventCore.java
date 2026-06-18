@@ -71,7 +71,7 @@ public class EventCore extends JavaPlugin {
             new PlaceholderHook().register();
         }
 
-        Scheduler.timerAsync(new BorderUtil(), 20, 10);
+        Scheduler.timer(new BorderUtil(), 20, 10);
         startAutoBroadcast();
         startActionbarTask();
 

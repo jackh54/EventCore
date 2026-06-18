@@ -161,9 +161,22 @@ public class BorderUtil implements Runnable {
 
     private static boolean hasStandingRoom(@NotNull Location location) {
         World world = location.getWorld();
+        if (world == null) {
+            return false;
+        }
+
         int x = location.getBlockX();
         int y = location.getBlockY();
         int z = location.getBlockZ();
+
+        // Querying block states forces the chunk to load and, at the world
+        // frontier where borders usually sit, to generate. Doing that from a
+        // movement or damage handler would block the main thread, so treat
+        // unloaded areas as open and apply the cheap velocity boost instead of
+        // stalling the server to generate terrain.
+        if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+            return true;
+        }
 
         return isPassable(world.getBlockAt(x, y, z)) && isPassable(world.getBlockAt(x, y + 1, z));
     }
@@ -299,14 +312,9 @@ public class BorderUtil implements Runnable {
         }
 
         lastOptimal = optimal;
-        Scheduler.runSync(() -> {
-            var world = spawnLocation.getWorld();
-            if (world == null) {
-                return;
-            }
-            double current = world.getWorldBorder().getSize();
-            world.getWorldBorder().setSize(optimal, (long) Math.max(1, current - optimal));
-        });
+        WorldBorder border = spawnLocation.getWorld().getWorldBorder();
+        double current = border.getSize();
+        border.setSize(optimal, (long) Math.max(1, current - optimal));
     }
 
     private int getOptimalSize() {
