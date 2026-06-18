@@ -16,25 +16,13 @@ public class PlayerMoveListener implements Listener {
             return;
         }
 
-        Location from = event.getFrom();
         Location to = event.getTo();
-        if (to == null) {
+        if (to == null || BorderUtil.isInsideBorder(to)) {
             return;
         }
 
-        if (BorderUtil.isInsideBorder(from) && BorderUtil.isOutsideBorder(to)) {
-            event.setTo(BorderUtil.clampInsideBorder(to));
-            return;
-        }
-
-        if (BorderUtil.isOutsideBorder(to)) {
-            if (BorderUtil.isFarOutsideBorder(to)) {
-                event.setTo(BorderUtil.clampInsideBorder(to));
-                return;
-            }
-
-            BorderUtil.handleOutsidePlayer(event.getPlayer());
-        }
+        event.setTo(BorderUtil.clampInsideBorder(to));
+        BorderUtil.handleOutsidePlayer(event.getPlayer(), to);
     }
 
     @EventHandler

@@ -27,6 +27,14 @@ public class BorderUtil implements Runnable {
 
     private static final int SAFE_PATH_CHECK_STEPS = 3;
     private static final long BORDER_TICK_COOLDOWN_MS = 250L;
+
+    /**
+     * Distance, in blocks, kept between the player and the exact border edge when
+     * clamping them back inside. The world border is square, so each axis is
+     * clamped independently to guarantee the smallest possible correction.
+     */
+    private static final double BORDER_EDGE_INSET = 0.35;
+
     private static final Map<UUID, Long> LAST_BORDER_TICK = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> LAST_UNSAFE_DAMAGE = new ConcurrentHashMap<>();
 
@@ -73,59 +81,63 @@ public class BorderUtil implements Runnable {
         return !isInsideBorder(location);
     }
 
-    public static double getDistanceBeyondBorder(@NotNull Location location) {
-        WorldBorder worldBorder = location.getWorld().getWorldBorder();
-        Location center = worldBorder.getCenter();
-        double halfSize = worldBorder.getSize() / 2.0;
-
-        double dx = location.getX() - center.getX();
-        double dz = location.getZ() - center.getZ();
-        double horizontalDistance = Math.hypot(dx, dz);
-        return Math.max(0, horizontalDistance - halfSize);
-    }
-
-    public static boolean isFarOutsideBorder(@NotNull Location location) {
-        return getDistanceBeyondBorder(location) > 2.0;
-    }
-
+    /**
+     * Returns the player location clamped to the nearest point just inside the
+     * (square) world border. Each axis is clamped independently so the player is
+     * only nudged by the minimum amount required to stay inside, which prevents
+     * the large diagonal jumps that radial clamping produced near corners.
+     */
     public static @NotNull Location clampInsideBorder(@NotNull Location location) {
         WorldBorder worldBorder = location.getWorld().getWorldBorder();
         Location center = worldBorder.getCenter();
-        double halfSize = Math.max(0.1, (worldBorder.getSize() / 2.0) - 0.35);
+        double limit = Math.max(0.0, (worldBorder.getSize() / 2.0) - BORDER_EDGE_INSET);
 
-        double dx = location.getX() - center.getX();
-        double dz = location.getZ() - center.getZ();
-        double horizontalDistance = Math.hypot(dx, dz);
-        if (horizontalDistance <= halfSize) {
+        double minX = center.getX() - limit;
+        double maxX = center.getX() + limit;
+        double minZ = center.getZ() - limit;
+        double maxZ = center.getZ() + limit;
+
+        double clampedX = clamp(location.getX(), minX, maxX);
+        double clampedZ = clamp(location.getZ(), minZ, maxZ);
+        if (clampedX == location.getX() && clampedZ == location.getZ()) {
             return location;
         }
 
-        double scale = halfSize / horizontalDistance;
         return new Location(
                 location.getWorld(),
-                center.getX() + (dx * scale),
+                clampedX,
                 location.getY(),
-                location.getZ() + (dz * scale),
+                clampedZ,
                 location.getYaw(),
                 location.getPitch()
         );
     }
 
+    private static double clamp(double value, double min, double max) {
+        if (min > max) {
+            return (min + max) / 2.0;
+        }
+        return Math.min(max, Math.max(min, value));
+    }
+
+    /**
+     * Checks whether pushing the player back toward the border center has open
+     * space, so the boost does not shove the player into a wall or underground.
+     */
     public static boolean hasSafeBoostSpace(@NotNull Player player) {
-        Location location = player.getLocation();
+        return hasSafeBoostSpace(player.getWorld().getWorldBorder(), player.getLocation());
+    }
+
+    private static boolean hasSafeBoostSpace(@NotNull WorldBorder worldBorder, @NotNull Location location) {
         if (!hasStandingRoom(location)) {
             return false;
         }
 
-        WorldBorder worldBorder = player.getWorld().getWorldBorder();
-        Location center = worldBorder.getCenter();
-        Vector direction = center.toVector().subtract(location.toVector());
-        direction.setY(0);
-        if (direction.lengthSquared() < 0.0001) {
+        Vector direction = inwardDirection(worldBorder, location);
+        if (direction == null) {
             return true;
         }
 
-        direction.normalize();
         Location probe = location.clone();
         for (int step = 1; step <= SAFE_PATH_CHECK_STEPS; step++) {
             probe.add(direction);
@@ -135,6 +147,16 @@ public class BorderUtil implements Runnable {
         }
 
         return true;
+    }
+
+    private static @Nullable Vector inwardDirection(@NotNull WorldBorder worldBorder, @NotNull Location location) {
+        Location center = worldBorder.getCenter();
+        Vector direction = center.toVector().subtract(location.toVector());
+        direction.setY(0);
+        if (direction.lengthSquared() < 0.0001) {
+            return null;
+        }
+        return direction.normalize();
     }
 
     private static boolean hasStandingRoom(@NotNull Location location) {
@@ -154,14 +176,18 @@ public class BorderUtil implements Runnable {
         return player.isValid() && !player.isDead() && player.getGameMode() == GameMode.SURVIVAL;
     }
 
-    public static void handleOutsidePlayer(@NotNull Player player) {
-        if (!isBoostEnabled() || !shouldHandlePlayer(player) || !isOutsideBorder(player.getLocation())) {
+    /**
+     * Applies the border response for a player whose attempted destination is
+     * outside the border. The caller is expected to have already clamped the
+     * player's movement back inside; this method only adds the velocity boost
+     * (or unsafe damage) so the player feels a sensible bounce instead of a
+     * teleport.
+     */
+    public static void handleOutsidePlayer(@NotNull Player player, @Nullable Location outsideLocation) {
+        if (!isBoostEnabled() || !shouldHandlePlayer(player)) {
             return;
         }
-
-        Location location = player.getLocation();
-        if (isFarOutsideBorder(location)) {
-            player.teleportAsync(clampInsideBorder(location));
+        if (outsideLocation == null || isInsideBorder(outsideLocation)) {
             return;
         }
 
@@ -172,8 +198,9 @@ public class BorderUtil implements Runnable {
         }
         LAST_BORDER_TICK.put(playerId, now);
 
-        if (hasSafeBoostSpace(player)) {
-            applyBoost(player);
+        WorldBorder worldBorder = outsideLocation.getWorld().getWorldBorder();
+        if (hasSafeBoostSpace(worldBorder, outsideLocation)) {
+            applyBoost(player, worldBorder, outsideLocation);
         } else {
             applyUnsafeDamage(player);
         }
@@ -195,24 +222,14 @@ public class BorderUtil implements Runnable {
         return null;
     }
 
-    private static void applyBoost(@NotNull Player player) {
-        Location playerLocation = player.getLocation();
-        WorldBorder worldBorder = player.getWorld().getWorldBorder();
-        if (worldBorder.isInside(playerLocation) || !hasSafeBoostSpace(player)) {
+    private static void applyBoost(@NotNull Player player, @NotNull WorldBorder worldBorder, @NotNull Location outsideLocation) {
+        Vector direction = inwardDirection(worldBorder, outsideLocation);
+        if (direction == null) {
             return;
         }
 
         double boostXZ = EventCore.getInstance().getConfig().getDouble("Settings.WorldBorder.Boost.StrengthXZ", 1.3);
-
-        Location center = worldBorder.getCenter();
-        Vector push = center.toVector().subtract(playerLocation.toVector());
-        push.setY(0);
-        if (push.lengthSquared() < 0.0001) {
-            return;
-        }
-
-        push.normalize().multiply(boostXZ);
-        player.setVelocity(push);
+        player.setVelocity(direction.multiply(boostXZ));
     }
 
     private static void applyUnsafeDamage(@NotNull Player player) {
