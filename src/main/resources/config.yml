@@ -31,10 +31,11 @@ Settings:
     AutoBorder: false # Change the default value of the AutoBorder feature
     DefaultSize: 200 # Default size before and after the event
     DisableEnderPeals: true # Disable EnderPeals outside the world border
-    Boost: # Boost players who are outside the border into the border
+    Boost: # Push players back when outside the border (open space only)
       Enabled: true
-      StrengthXZ: 1.3 # Strength in X and Z direction
-      StrengthY: 0.1 # Strength in Y direction
+      StrengthXZ: 1.3 # Horizontal push strength toward the border center
+      StrengthY: 0.1 # Unused — push is horizontal only to prevent border hovering
+      UnsafeDamage: 4.0 # Damage per hit when trapped underground or in a wall
     Damage:
       Buffer: 0.0 # It is recommended to use '0' if the boost is activated
       Amount: 0.2 # Damage per block

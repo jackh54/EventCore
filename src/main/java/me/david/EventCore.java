@@ -29,7 +29,6 @@ public class EventCore extends JavaPlugin {
     private KitManager kitManager;
     private Scheduler.TaskWrapper actionbarTask;
     private Scheduler.TaskWrapper autoBroadcastTask;
-    private Scheduler.TaskWrapper borderBoostTask;
 
     @Override
     public void onEnable() {
@@ -62,6 +61,7 @@ public class EventCore extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new PlayerDropItemListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerInteractListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerJoinListener(), this);
+        Bukkit.getPluginManager().registerEvents(new PlayerMoveListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerPickupItemListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerQuitListener(), this);
         Bukkit.getPluginManager().registerEvents(new PlayerRespawnListener(), this);
@@ -71,10 +71,9 @@ public class EventCore extends JavaPlugin {
             new PlaceholderHook().register();
         }
 
-        Scheduler.timerAsync(new BorderUtil(), 20, 10);
+        Scheduler.timer(new BorderUtil(), 20, 10);
         startAutoBroadcast();
         startActionbarTask();
-        startBorderBoostTask();
 
         Scheduler.wait(() -> {
             World world = mapManager.getSpawnLocation().getWorld();
@@ -93,7 +92,6 @@ public class EventCore extends JavaPlugin {
     public void onDisable() {
         stopActionbarTask();
         stopAutoBroadcast();
-        stopBorderBoostTask();
         if (gameManager != null && gameManager.isRunning()) {
             gameManager.stop(null);
         }
@@ -117,15 +115,10 @@ public class EventCore extends JavaPlugin {
         applyWorldBorderSettings();
         restartAutoBroadcast();
         restartActionbarTask();
-        restartBorderBoostTask();
     }
 
     private void applyWorldBorderSettings() {
-        for (World world : Bukkit.getWorlds()) {
-            world.getWorldBorder().setSize(BorderUtil.borderDefault);
-            world.getWorldBorder().setDamageBuffer(BorderUtil.borderDamageBuffer);
-            world.getWorldBorder().setDamageAmount(BorderUtil.borderDamageAmount);
-        }
+        BorderUtil.syncAllWorldBorders(mapManager != null ? mapManager.getSpawnLocation() : null);
     }
 
     private void startAutoBroadcast() {
@@ -171,36 +164,6 @@ public class EventCore extends JavaPlugin {
 
     private void restartActionbarTask() {
         startActionbarTask();
-    }
-
-    private void startBorderBoostTask() {
-        stopBorderBoostTask();
-        if (!BorderUtil.isBoostEnabled()) {
-            return;
-        }
-
-        borderBoostTask = Scheduler.timer(() -> {
-            if (!gameManager.isRunning()) {
-                return;
-            }
-
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (BorderUtil.isOutsideBorder(player.getLocation())) {
-                    BorderUtil.applyBoost(player);
-                }
-            }
-        }, 1, 5);
-    }
-
-    private void stopBorderBoostTask() {
-        if (borderBoostTask != null) {
-            borderBoostTask.cancel();
-            borderBoostTask = null;
-        }
-    }
-
-    private void restartBorderBoostTask() {
-        startBorderBoostTask();
     }
 
 }

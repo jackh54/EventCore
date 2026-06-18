@@ -5,6 +5,7 @@ import lombok.Getter;
 import me.david.EventCore;
 import org.bukkit.Bukkit;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.entity.Entity;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -86,6 +87,14 @@ public class Scheduler {
     public static void runSync(@NotNull Runnable runnable) {
         if (FOLIA) {
             Bukkit.getGlobalRegionScheduler().execute(EventCore.getInstance(), runnable);
+        } else {
+            Bukkit.getScheduler().runTask(EventCore.getInstance(), runnable);
+        }
+    }
+
+    public static void runForEntity(@NotNull Entity entity, @NotNull Runnable runnable) {
+        if (FOLIA) {
+            entity.getScheduler().run(EventCore.getInstance(), (task) -> runnable.run(), null);
         } else {
             Bukkit.getScheduler().runTask(EventCore.getInstance(), runnable);
         }
